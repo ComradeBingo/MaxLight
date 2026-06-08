@@ -1,4 +1,8 @@
-# Max Light
+
+
+<div align="center"><img width="124" height="128" alt="Untitled-1" src="https://github.com/user-attachments/assets/74b0ec50-09c4-428a-8b47-c859d2960c2c" /></div>
+
+
 
 **Max Light** — это нативная Windows-обёртка для веб-мессенджера Max (web.max.ru), написанная на C# WinForms с использованием WebView2. Приложение добавляет отсутствующие в веб-версии возможности: системные уведомления, работу через трей, PIN-код, автозапуск и автоматические обновления через Velopack.
 
