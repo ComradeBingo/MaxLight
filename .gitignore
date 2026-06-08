@@ -1,0 +1,11 @@
+.vs/
+.DS_Store
+Thumbs.db
+bin/
+obj/
+publish/
+releases/
+FodyWeavers.xsd
+FodyWeavers.xml.*
+weaver/
+README.md
