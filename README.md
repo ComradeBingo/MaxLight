@@ -50,7 +50,7 @@
 ## 📥 Установка и обновление
 
 ### Установка
-1. Скачать `MaxLight-win-Setup.exe` из последнего релиза
+1. Скачать `MaxLight-win-Setup.exe` из  <a href="https://github.com/ComradeBingo/MaxLight/releases">последнего релиза</a>
 2. Запустить установщик
 3. Следуйте инструкциям на экране
 
