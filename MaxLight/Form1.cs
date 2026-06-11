@@ -677,6 +677,9 @@ namespace MaxLight
                     _authRestored = true;
                 }
 
+                // Блок инфобаара (верхня строка с рекламой всякой херни)
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("setInterval(()=>{const e=document.querySelector('.infobar.svelte-1aijhs3');if(e)e.remove()},100);");
+
                 // ========== 2. ЗАЩИТА ОТ XSS ==========
                 await XssProtection.InjectProtectionScript(webView.CoreWebView2);
 
