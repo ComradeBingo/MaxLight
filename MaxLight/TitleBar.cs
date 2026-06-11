@@ -34,7 +34,7 @@ namespace MaxLight
             this.Cursor = Cursors.SizeAll;
 
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            string shortVersion = string.Join(".", version.Split('.').Take(2));
+            string shortVersion = string.Join(".", version.Split('.').Take(3));
 
             // Заголовок - центрируем по вертикали
             lblTitle = new Label

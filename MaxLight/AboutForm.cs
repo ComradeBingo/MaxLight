@@ -87,33 +87,33 @@ namespace MaxLight
                 Size = new Size(430, 130)
             };
 
-            // GitHub ссылка
+            
+            // GitHub кнопка
             lblGitHub = new LinkLabel
             {
-                Text = "🐙 GitHub: https://github.com/ComradeBingo",
-                Font = new Font("Segoe UI", 9),
-                ForeColor = Color.FromArgb(52, 152, 219),
+                Text = "GitHub",
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Black,
                 Location = new Point(25, 285),
-                AutoSize = true,
-                LinkColor = Color.FromArgb(52, 152, 219),
-                ActiveLinkColor = Color.FromArgb(41, 128, 185),
-                VisitedLinkColor = Color.FromArgb(52, 152, 219)
+                Size = new Size(80, 25),
+                TextAlign = ContentAlignment.MiddleCenter,
+                LinkColor = Color.White,
+                ActiveLinkColor = Color.LightGray,
+                VisitedLinkColor = Color.White
             };
+            // Отключаем подчёркивание
+            lblGitHub.LinkBehavior = LinkBehavior.NeverUnderline;
+
+            // Центрируем по горизонтали
+            lblGitHub.Location = new Point((this.ClientSize.Width - lblGitHub.Width) / 2, 285);
+
+            lblGitHub.BorderStyle = BorderStyle.FixedSingle;
+            lblGitHub.LinkClicked += (s, e) =>
+                        lblGitHub.BorderStyle = BorderStyle.FixedSingle;
             lblGitHub.LinkClicked += (s, e) =>
             {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "https://github.com/ComradeBingo",
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Не удалось открыть ссылку: {ex.Message}", "Ошибка",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                Process.Start(new ProcessStartInfo("https://github.com/ComradeBingo/MaxLight") { UseShellExecute = true });
             };
 
             // Копирайт
@@ -140,10 +140,8 @@ namespace MaxLight
             };
             btnOk.FlatAppearance.BorderSize = 0;
             btnOk.Click += (s, e) => this.Close();
+            btnOk.Location = new Point((this.ClientSize.Width - lblGitHub.Width) / 2, 365);
 
-            // Ховер-эффект для кнопки
-            btnOk.MouseEnter += (s, e) => btnOk.BackColor = Color.FromArgb(41, 128, 185);
-            btnOk.MouseLeave += (s, e) => btnOk.BackColor = Color.FromArgb(52, 152, 219);
 
             // Добавляем элементы
             headerPanel.Controls.Add(lblTitle);
