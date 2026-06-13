@@ -80,6 +80,7 @@ namespace MaxLight
                        "• Блокировка 8+ типов трекеров\n" +
                        "• Зашифрованное хранилище (AES-256)\n" +
                        "• Автоматическая очистка кеша при выходе\n" +
+                       "• Блокировка рекламного баннера\n" +
                        "• Уведомления в трее\n",
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.FromArgb(80, 80, 80),
@@ -87,16 +88,27 @@ namespace MaxLight
                 Size = new Size(430, 130)
             };
 
-            
+
+            // Копирайт
+            Label lblCopyright = new Label
+            {
+                Text = "© 2026 Max Light",
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.FromArgb(150, 150, 150),
+                AutoSize = true
+            };
+            // Центрируем по горизонтали
+            lblCopyright.Location = new Point((this.ClientSize.Width - lblCopyright.Width) / 2, 305);
+
             // GitHub кнопка
             lblGitHub = new LinkLabel
             {
                 Text = "GitHub",
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Black,
                 Location = new Point(25, 285),
-                Size = new Size(80, 25),
+                Size = new Size(120, 38),
                 TextAlign = ContentAlignment.MiddleCenter,
                 LinkColor = Color.White,
                 ActiveLinkColor = Color.LightGray,
@@ -106,7 +118,7 @@ namespace MaxLight
             lblGitHub.LinkBehavior = LinkBehavior.NeverUnderline;
 
             // Центрируем по горизонтали
-            lblGitHub.Location = new Point((this.ClientSize.Width - lblGitHub.Width) / 2, 285);
+            lblGitHub.Location = new Point((this.ClientSize.Width - lblGitHub.Width) / 2, 375);
 
             lblGitHub.BorderStyle = BorderStyle.FixedSingle;
             lblGitHub.LinkClicked += (s, e) =>
@@ -116,15 +128,7 @@ namespace MaxLight
                 Process.Start(new ProcessStartInfo("https://github.com/ComradeBingo/MaxLight") { UseShellExecute = true });
             };
 
-            // Копирайт
-            Label lblCopyright = new Label
-            {
-                Text = "© 2026 Max Light",
-                Font = new Font("Segoe UI", 8),
-                ForeColor = Color.FromArgb(150, 150, 150),
-                Location = new Point(25, 315),
-                AutoSize = true
-            };
+            
 
             // Кнопка OK
             btnOk = new Button
@@ -134,13 +138,12 @@ namespace MaxLight
                 ForeColor = Color.White,
                 Text = "OK",
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Size = new Size(80, 35),
-                Location = new Point(375, 365),
+                Size = new Size(120, 38),  // Такой же размер, как у btnClose
                 Cursor = Cursors.Hand
             };
             btnOk.FlatAppearance.BorderSize = 0;
             btnOk.Click += (s, e) => this.Close();
-            btnOk.Location = new Point((this.ClientSize.Width - lblGitHub.Width) / 2, 365);
+            btnOk.Location = new Point((this.ClientSize.Width - btnOk.Width) / 2, 420);  // Y = 420
 
 
             // Добавляем элементы
@@ -169,17 +172,7 @@ namespace MaxLight
                 this.Region = new Region(path);
             };
 
-            // Анимация появления
-            this.Opacity = 0;
-            Timer fadeTimer = new Timer { Interval = 10 };
-            fadeTimer.Tick += (s, e) =>
-            {
-                if (this.Opacity < 0.98)
-                    this.Opacity += 0.1;
-                else
-                    fadeTimer.Stop();
-            };
-            fadeTimer.Start();
+            
         }
     }
 }

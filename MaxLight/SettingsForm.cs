@@ -11,6 +11,7 @@ namespace MaxLight
         private Panel headerPanel;
         private Label lblTitle;
         private CheckBox chkAutoStart;
+        private CheckBox chkNotificationsOnTop;
         private Button btnPinSettings;
         private Button btnLogout;
         private Button btnAbout;
@@ -18,6 +19,7 @@ namespace MaxLight
 
         // События для связи с Form1
         public event Action AutoStartToggled;
+        public event Action<bool> NotificationsOnTopToggled;
         public event Action PinSettingsClicked;
         public event Action LogoutClicked;
         public event Action AboutClicked;
@@ -27,17 +29,18 @@ namespace MaxLight
             InitializeForm();
             SetupModernStyle();
             LoadAutoStartState();
+            LoadNotificationsOnTopState();
         }
 
         private void InitializeForm()
         {
             this.Text = "Настройки Max Light";
-            this.Size = new Size(480, 480);
+            this.Size = new Size(480, 550);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(480, 480);
-            this.MaximumSize = new Size(480, 480);
+            this.MinimumSize = new Size(480, 550);
+            this.MaximumSize = new Size(480, 550);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
@@ -71,7 +74,7 @@ namespace MaxLight
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
 
-            // Разделитель (по центру)
+            // Разделитель
             Label separator1 = new Label
             {
                 Text = "________________________________________",
@@ -81,17 +84,49 @@ namespace MaxLight
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            // Заголовок секции "Безопасность" (по центру)
+            // Заголовок секции "Уведомления"
+            Label lblNotificationsSection = new Label
+            {
+                Text = "🔔 Уведомления",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 175),
+                AutoSize = true
+            };
+
+            // Уведомления поверх всех окон
+            chkNotificationsOnTop = new CheckBox
+            {
+                Text = "Показывать уведомления поверх всех окон",
+                Font = new Font("Segoe UI", 10),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point((this.ClientSize.Width - 320) / 2, 205),
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            chkNotificationsOnTop.CheckedChanged += (s, e) => NotificationsOnTopToggled?.Invoke(chkNotificationsOnTop.Checked);
+
+            // Разделитель
+            Label separator2 = new Label
+            {
+                Text = "________________________________________",
+                ForeColor = Color.FromArgb(200, 200, 200),
+                Location = new Point(40, 240),
+                Width = 400,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            // Заголовок секции "Безопасность"
             Label lblSecuritySection = new Label
             {
                 Text = "🔒 Безопасность",
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 170),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 265),
                 AutoSize = true
             };
 
-            // PIN-код (по центру)
+            // PIN-код
             btnPinSettings = new Button
             {
                 Text = "🔑 Управление PIN-кодом",
@@ -100,24 +135,34 @@ namespace MaxLight
                 BackColor = Color.FromArgb(52, 73, 94),
                 ForeColor = Color.White,
                 Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 200),
+                Location = new Point((this.ClientSize.Width - 220) / 2, 295),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnPinSettings.FlatAppearance.BorderSize = 0;
             btnPinSettings.Click += (s, e) => PinSettingsClicked?.Invoke();
 
-            // Заголовок секции "Аккаунт" (по центру)
+            // Разделитель
+            Label separator3 = new Label
+            {
+                Text = "________________________________________",
+                ForeColor = Color.FromArgb(200, 200, 200),
+                Location = new Point(40, 345),
+                Width = 400,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            // Заголовок секции "Аккаунт"
             Label lblAccountSection = new Label
             {
                 Text = "👤 Аккаунт",
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 100) / 2, 260),
+                Location = new Point((this.ClientSize.Width - 100) / 2, 370),
                 AutoSize = true
             };
 
-            // Выход из аккаунта (по центру)
+            // Выход из аккаунта
             btnLogout = new Button
             {
                 Text = "🚪 Выйти из аккаунта",
@@ -126,14 +171,14 @@ namespace MaxLight
                 BackColor = Color.FromArgb(231, 76, 60),
                 ForeColor = Color.White,
                 Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 290),
+                Location = new Point((this.ClientSize.Width - 220) / 2, 400),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnLogout.FlatAppearance.BorderSize = 0;
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
 
-            // О программе (по центру)
+            // О программе
             btnAbout = new Button
             {
                 Text = "ℹ️ О программе",
@@ -142,14 +187,14 @@ namespace MaxLight
                 BackColor = Color.FromArgb(149, 165, 166),
                 ForeColor = Color.White,
                 Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 345),
+                Location = new Point((this.ClientSize.Width - 220) / 2, 450),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnAbout.FlatAppearance.BorderSize = 0;
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
 
-            // Кнопка закрытия (по центру внизу)
+            // Кнопка закрытия
             btnClose = new Button
             {
                 Text = "Закрыть",
@@ -158,7 +203,7 @@ namespace MaxLight
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Size = new Size(120, 38),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 420),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 500),
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
@@ -169,8 +214,12 @@ namespace MaxLight
             this.Controls.Add(headerPanel);
             this.Controls.Add(chkAutoStart);
             this.Controls.Add(separator1);
+            this.Controls.Add(lblNotificationsSection);
+            this.Controls.Add(chkNotificationsOnTop);
+            this.Controls.Add(separator2);
             this.Controls.Add(lblSecuritySection);
             this.Controls.Add(btnPinSettings);
+            this.Controls.Add(separator3);
             this.Controls.Add(lblAccountSection);
             this.Controls.Add(btnLogout);
             this.Controls.Add(btnAbout);
@@ -181,12 +230,16 @@ namespace MaxLight
             {
                 chkAutoStart.Location = new Point((this.ClientSize.Width - chkAutoStart.Width) / 2, 110);
                 separator1.Location = new Point(40, 145);
-                lblSecuritySection.Location = new Point((this.ClientSize.Width - lblSecuritySection.Width) / 2, 170);
-                btnPinSettings.Location = new Point((this.ClientSize.Width - btnPinSettings.Width) / 2, 200);
-                lblAccountSection.Location = new Point((this.ClientSize.Width - lblAccountSection.Width) / 2, 260);
-                btnLogout.Location = new Point((this.ClientSize.Width - btnLogout.Width) / 2, 290);
-                btnAbout.Location = new Point((this.ClientSize.Width - btnAbout.Width) / 2, 345);
-                btnClose.Location = new Point((this.ClientSize.Width - btnClose.Width) / 2, 420);
+                lblNotificationsSection.Location = new Point((this.ClientSize.Width - lblNotificationsSection.Width) / 2, 175);
+                chkNotificationsOnTop.Location = new Point((this.ClientSize.Width - chkNotificationsOnTop.Width) / 2, 205);
+                separator2.Location = new Point(40, 240);
+                lblSecuritySection.Location = new Point((this.ClientSize.Width - lblSecuritySection.Width) / 2, 265);
+                btnPinSettings.Location = new Point((this.ClientSize.Width - btnPinSettings.Width) / 2, 295);
+                separator3.Location = new Point(40, 345);
+                lblAccountSection.Location = new Point((this.ClientSize.Width - lblAccountSection.Width) / 2, 370);
+                btnLogout.Location = new Point((this.ClientSize.Width - btnLogout.Width) / 2, 400);
+                btnAbout.Location = new Point((this.ClientSize.Width - btnAbout.Width) / 2, 450);
+                btnClose.Location = new Point((this.ClientSize.Width - btnClose.Width) / 2, 500);
             };
         }
 
@@ -220,9 +273,38 @@ namespace MaxLight
             chkAutoStart.Checked = IsAutoStartEnabled();
         }
 
+        private void LoadNotificationsOnTopState()
+        {
+            // Загружаем сохраненную настройку из реестра
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\MaxLight"))
+                {
+                    if (key != null)
+                    {
+                        int value = (int)key.GetValue("NotificationsOnTop", 1);
+                        chkNotificationsOnTop.Checked = value == 1;
+                    }
+                    else
+                    {
+                        chkNotificationsOnTop.Checked = true; // По умолчанию true
+                    }
+                }
+            }
+            catch
+            {
+                chkNotificationsOnTop.Checked = true;
+            }
+        }
+
         public void SetAutoStartChecked(bool enabled)
         {
             chkAutoStart.Checked = enabled;
+        }
+
+        public void SetNotificationsOnTopChecked(bool enabled)
+        {
+            chkNotificationsOnTop.Checked = enabled;
         }
     }
 }

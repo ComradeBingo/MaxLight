@@ -66,6 +66,9 @@ namespace MaxLight
             LoadIcons();
             CreateTitleBar();
 
+            // Загружаем настройку для уведомлений
+            LoadNotificationsOnTopSetting();
+
             CreateErrorPanel();
             CreateResizeBorders();
             CreateWebView();
@@ -616,6 +619,7 @@ namespace MaxLight
         {
             var settingsForm = new SettingsForm();
             settingsForm.AutoStartToggled += ToggleAutoStart;
+            settingsForm.NotificationsOnTopToggled += ToggleNotificationsOnTop;
             settingsForm.PinSettingsClicked += ShowPinSettings;
             settingsForm.LogoutClicked += async () => await Logout();
             settingsForm.AboutClicked += ShowAbout;
@@ -1566,6 +1570,64 @@ namespace MaxLight
         }
 
         #endregion
+
+        #region Настройки уведомлений
+
+        private void LoadNotificationsOnTopSetting()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\MaxLight"))
+                {
+                    if (key != null)
+                    {
+                        object value = key.GetValue("NotificationsOnTop");
+                        if (value != null && value is int)
+                        {
+                            CustomNotification.AlwaysOnTop = ((int)value) == 1;
+                        }
+                        else
+                        {
+                            CustomNotification.AlwaysOnTop = true; // По умолчанию true
+                        }
+                    }
+                    else
+                    {
+                        CustomNotification.AlwaysOnTop = true;
+                    }
+                }
+            }
+            catch
+            {
+                CustomNotification.AlwaysOnTop = true;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"🔔 Настройка уведомлений: TopMost = {CustomNotification.AlwaysOnTop}");
+        }
+
+        private void ToggleNotificationsOnTop(bool isOnTop)
+        {
+            // Сохраняем в реестр
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\MaxLight"))
+                {
+                    key.SetValue("NotificationsOnTop", isOnTop ? 1 : 0);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка сохранения настройки: {ex.Message}");
+            }
+
+            // Обновляем глобальную настройку для будущих уведомлений
+            CustomNotification.AlwaysOnTop = isOnTop;
+
+            System.Diagnostics.Debug.WriteLine($"🔔 Настройка уведомлений изменена: TopMost = {isOnTop}");
+        }
+
+        #endregion
+
     }
 
     internal class AuthData

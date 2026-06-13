@@ -11,6 +11,7 @@ namespace MaxLight
         private Timer autoCloseTimer;
         private static int notificationCount = 0;
         private static object lockObj = new object();
+        private static bool _alwaysOnTop = true; // Статическая настройка по умолчанию
 
         private string _userName;
         private Action<string> _onClick;
@@ -21,6 +22,13 @@ namespace MaxLight
         private const int FORM_PADDING = 12;
 
         private Button closeButton;
+
+        // Глобальное свойство для настройки TopMost
+        public static bool AlwaysOnTop
+        {
+            get { return _alwaysOnTop; }
+            set { _alwaysOnTop = value; }
+        }
 
         // ========== НЕ ПЕРЕХВАТЫВАЕТ ФОКУС ==========
         protected override bool ShowWithoutActivation => true;
@@ -183,9 +191,6 @@ namespace MaxLight
             autoCloseTimer.Start();
 
             PositionNotification();
-
-            // ========== ВАЖНО: НЕ ПЕРЕХВАТЫВАЕТ ФОКУС, НЕ ПОВЕРХ ВСЕХ ОКОН ==========
-            // TopMost НЕ устанавливаем!
         }
 
         private string FormatMessageToMaxLines(string message, int maxLines)
@@ -349,9 +354,8 @@ namespace MaxLight
             this.BackColor = Color.FromArgb(45, 45, 48);
             this.Opacity = 0.95;
 
-            // ========== ГЛАВНОЕ: НЕ ПЕРЕХВАТЫВАЕТ ФОКУС ==========
-            this.TopMost = false;
-            // ShowWithoutActivation уже переопределен выше через свойство
+            // Используем глобальную настройку для TopMost
+            this.TopMost = _alwaysOnTop;
 
             this.Load += (s, e) => SetRoundedRegion();
             this.Resize += (s, e) => SetRoundedRegion();
