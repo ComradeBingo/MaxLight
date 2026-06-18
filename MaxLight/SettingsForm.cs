@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Linq;
 
 namespace MaxLight
 {
@@ -17,30 +18,65 @@ namespace MaxLight
         private Button btnAbout;
         private Button btnClose;
 
+        // Элементы прокси
+        private GroupBox grpProxy;
+        private CheckBox chkProxyEnabled;
+        private Label lblProxyServer;
+        private TextBox txtProxyServer;
+        private Label lblProxyPort;
+        private NumericUpDown numProxyPort;
+        private Button btnApplyProxy;
+
         // События для связи с Form1
         public event Action AutoStartToggled;
         public event Action<bool> NotificationsOnTopToggled;
         public event Action PinSettingsClicked;
         public event Action LogoutClicked;
         public event Action AboutClicked;
+        public event Action ProxySettingsChanged;
+
+        // Флаг portable режима
+        private bool _isPortable;
+
+        // Сохраняем исходные настройки прокси при открытии
+        private ConfigManager.ProxySettings _originalProxySettings;
 
         public SettingsForm()
         {
+            // Определяем portable режим
+            _isPortable = IsPortableMode();
+
             InitializeForm();
             SetupModernStyle();
             LoadAutoStartState();
             LoadNotificationsOnTopState();
+            LoadProxySettings();
+
+            // Если portable - отключаем автозапуск
+            if (_isPortable)
+            {
+                chkAutoStart.Enabled = false;
+                chkAutoStart.Checked = false;
+                chkAutoStart.Text = "Автоматический запуск\nнедоступен в portable-версии";
+                chkAutoStart.ForeColor = Color.Gray;
+            }
+        }
+
+        private bool IsPortableMode()
+        {
+            var args = Environment.GetCommandLineArgs();
+            return args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase));
         }
 
         private void InitializeForm()
         {
             this.Text = "Настройки Max Light";
-            this.Size = new Size(480, 550);
+            this.Size = new Size(750, 480);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(480, 550);
-            this.MaximumSize = new Size(480, 550);
+            this.MinimumSize = new Size(750, 480);
+            this.MaximumSize = new Size(750, 480);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
@@ -48,7 +84,7 @@ namespace MaxLight
             headerPanel = new Panel
             {
                 BackColor = Color.FromArgb(52, 73, 94),
-                Height = 80,
+                Height = 70,
                 Dock = DockStyle.Top
             };
 
@@ -58,75 +94,63 @@ namespace MaxLight
                 Text = "Настройки",
                 Font = new Font("Segoe UI", 18, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(20, 28),
+                Location = new Point(20, 22),
                 AutoSize = true
             };
 
-            // Автозапуск (по центру)
+            // ===== ЛЕВАЯ КОЛОНКА =====
+            int leftColumnX = 30;
+            int rightColumnX = 390;
+            int rowY = 100;
+            int rowSpacing = 45;
+
+            // ===== СЕКЦИЯ 1: АВТОЗАПУСК (ЛЕВАЯ КОЛОНКА) =====
             chkAutoStart = new CheckBox
             {
-                Text = "Автоматически запускать при входе в Windows",
+                Text = "Автоматически запускать\nпри входе в Windows",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 300) / 2, 110),
+                Location = new Point(leftColumnX, rowY),
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
 
-            // Разделитель
-            Label separator1 = new Label
-            {
-                Text = "________________________________________",
-                ForeColor = Color.FromArgb(200, 200, 200),
-                Location = new Point(40, 145),
-                Width = 400,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            // Заголовок секции "Уведомления"
+            // ===== СЕКЦИЯ 2: УВЕДОМЛЕНИЯ (ЛЕВАЯ КОЛОНКА) =====
+            rowY += rowSpacing;
             Label lblNotificationsSection = new Label
             {
                 Text = "🔔 Уведомления",
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 175),
+                Location = new Point(leftColumnX, rowY),
                 AutoSize = true
             };
 
-            // Уведомления поверх всех окон
+            rowY += 28;
             chkNotificationsOnTop = new CheckBox
             {
-                Text = "Показывать уведомления поверх всех окон",
+                Text = "Показывать уведомления\nповерх всех окон",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 320) / 2, 205),
+                Location = new Point(leftColumnX + 20, rowY),
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
             chkNotificationsOnTop.CheckedChanged += (s, e) => NotificationsOnTopToggled?.Invoke(chkNotificationsOnTop.Checked);
 
-            // Разделитель
-            Label separator2 = new Label
-            {
-                Text = "________________________________________",
-                ForeColor = Color.FromArgb(200, 200, 200),
-                Location = new Point(40, 240),
-                Width = 400,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            // Заголовок секции "Безопасность"
+            // ===== СЕКЦИЯ 3: БЕЗОПАСНОСТЬ И АККАУНТ (ЛЕВАЯ КОЛОНКА) =====
+            rowY += rowSpacing + 10;
             Label lblSecuritySection = new Label
             {
-                Text = "🔒 Безопасность",
+                Text = "🔒 Безопасность и аккаунт",
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 265),
+                Location = new Point(leftColumnX, rowY),
                 AutoSize = true
             };
 
-            // PIN-код
+            rowY += 28;
             btnPinSettings = new Button
             {
                 Text = "🔑 Управление PIN-кодом",
@@ -134,35 +158,15 @@ namespace MaxLight
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(52, 73, 94),
                 ForeColor = Color.White,
-                Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 295),
+                Size = new Size(220, 35),
+                Location = new Point(leftColumnX + 20, rowY),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnPinSettings.FlatAppearance.BorderSize = 0;
             btnPinSettings.Click += (s, e) => PinSettingsClicked?.Invoke();
 
-            // Разделитель
-            Label separator3 = new Label
-            {
-                Text = "________________________________________",
-                ForeColor = Color.FromArgb(200, 200, 200),
-                Location = new Point(40, 345),
-                Width = 400,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            // Заголовок секции "Аккаунт"
-            Label lblAccountSection = new Label
-            {
-                Text = "👤 Аккаунт",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point((this.ClientSize.Width - 100) / 2, 370),
-                AutoSize = true
-            };
-
-            // Выход из аккаунта
+            rowY += 45;
             btnLogout = new Button
             {
                 Text = "🚪 Выйти из аккаунта",
@@ -170,15 +174,118 @@ namespace MaxLight
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(231, 76, 60),
                 ForeColor = Color.White,
-                Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 400),
+                Size = new Size(220, 35),
+                Location = new Point(leftColumnX + 20, rowY),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnLogout.FlatAppearance.BorderSize = 0;
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
 
-            // О программе
+            // ===== СЕКЦИЯ 4: ПРОКСИ (ПРАВАЯ КОЛОНКА) =====
+            int rightRowY = 100;
+
+            Label lblProxySection = new Label
+            {
+                Text = "🌐 Настройки прокси",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(rightColumnX, rightRowY),
+                AutoSize = true
+            };
+
+            rightRowY += 30;
+            grpProxy = new GroupBox
+            {
+                Location = new Point(rightColumnX, rightRowY),
+                Size = new Size(320, 125),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White
+            };
+
+            chkProxyEnabled = new CheckBox
+            {
+                Text = "Использовать прокси-сервер",
+                Font = new Font("Segoe UI", 10),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(15, 15),
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            chkProxyEnabled.CheckedChanged += (s, e) =>
+            {
+                bool enabled = chkProxyEnabled.Checked;
+                txtProxyServer.Enabled = enabled;
+                numProxyPort.Enabled = enabled;
+                btnApplyProxy.Enabled = true;
+            };
+
+            lblProxyServer = new Label
+            {
+                Text = "Сервер:",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(15, 48),
+                AutoSize = true
+            };
+
+            txtProxyServer = new TextBox
+            {
+                Location = new Point(85, 45),
+                Size = new Size(190, 25),
+                Font = new Font("Segoe UI", 9),
+                Enabled = false
+            };
+            txtProxyServer.TextChanged += (s, e) => btnApplyProxy.Enabled = true;
+
+            lblProxyPort = new Label
+            {
+                Text = "Порт:",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(15, 80),
+                AutoSize = true
+            };
+
+            numProxyPort = new NumericUpDown
+            {
+                Location = new Point(85, 77),
+                Size = new Size(80, 25),
+                Font = new Font("Segoe UI", 9),
+                Minimum = 1,
+                Maximum = 65535,
+                Value = 8080,
+                Enabled = false
+            };
+            numProxyPort.ValueChanged += (s, e) => btnApplyProxy.Enabled = true;
+
+            btnApplyProxy = new Button
+            {
+                Text = "Применить",
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(46, 204, 113),
+                ForeColor = Color.White,
+                Size = new Size(90, 27),
+                Location = new Point(190, 75),
+                Cursor = Cursors.Hand,
+                Enabled = false
+            };
+            btnApplyProxy.FlatAppearance.BorderSize = 0;
+            btnApplyProxy.Click += (s, e) =>
+            {
+                ApplyProxySettings();
+            };
+
+            grpProxy.Controls.Add(chkProxyEnabled);
+            grpProxy.Controls.Add(lblProxyServer);
+            grpProxy.Controls.Add(txtProxyServer);
+            grpProxy.Controls.Add(lblProxyPort);
+            grpProxy.Controls.Add(numProxyPort);
+            grpProxy.Controls.Add(btnApplyProxy);
+
+            // ===== КНОПКА "О ПРОГРАММЕ" (ПРАВАЯ КОЛОНКА) =====
+            rightRowY += 170;
             btnAbout = new Button
             {
                 Text = "ℹ️ О программе",
@@ -186,15 +293,15 @@ namespace MaxLight
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(149, 165, 166),
                 ForeColor = Color.White,
-                Size = new Size(220, 38),
-                Location = new Point((this.ClientSize.Width - 220) / 2, 450),
+                Size = new Size(220, 35),
+                Location = new Point(rightColumnX + 50, rightRowY),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnAbout.FlatAppearance.BorderSize = 0;
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
 
-            // Кнопка закрытия
+            // Кнопка закрытия (внизу по центру)
             btnClose = new Button
             {
                 Text = "Закрыть",
@@ -203,7 +310,7 @@ namespace MaxLight
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Size = new Size(120, 38),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 500),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 415),
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
@@ -213,39 +320,19 @@ namespace MaxLight
             headerPanel.Controls.Add(lblTitle);
             this.Controls.Add(headerPanel);
             this.Controls.Add(chkAutoStart);
-            this.Controls.Add(separator1);
             this.Controls.Add(lblNotificationsSection);
             this.Controls.Add(chkNotificationsOnTop);
-            this.Controls.Add(separator2);
             this.Controls.Add(lblSecuritySection);
             this.Controls.Add(btnPinSettings);
-            this.Controls.Add(separator3);
-            this.Controls.Add(lblAccountSection);
             this.Controls.Add(btnLogout);
+            this.Controls.Add(lblProxySection);
+            this.Controls.Add(grpProxy);
             this.Controls.Add(btnAbout);
             this.Controls.Add(btnClose);
-
-            // Центрирование элементов при изменении размера
-            this.Resize += (s, e) =>
-            {
-                chkAutoStart.Location = new Point((this.ClientSize.Width - chkAutoStart.Width) / 2, 110);
-                separator1.Location = new Point(40, 145);
-                lblNotificationsSection.Location = new Point((this.ClientSize.Width - lblNotificationsSection.Width) / 2, 175);
-                chkNotificationsOnTop.Location = new Point((this.ClientSize.Width - chkNotificationsOnTop.Width) / 2, 205);
-                separator2.Location = new Point(40, 240);
-                lblSecuritySection.Location = new Point((this.ClientSize.Width - lblSecuritySection.Width) / 2, 265);
-                btnPinSettings.Location = new Point((this.ClientSize.Width - btnPinSettings.Width) / 2, 295);
-                separator3.Location = new Point(40, 345);
-                lblAccountSection.Location = new Point((this.ClientSize.Width - lblAccountSection.Width) / 2, 370);
-                btnLogout.Location = new Point((this.ClientSize.Width - btnLogout.Width) / 2, 400);
-                btnAbout.Location = new Point((this.ClientSize.Width - btnAbout.Width) / 2, 450);
-                btnClose.Location = new Point((this.ClientSize.Width - btnClose.Width) / 2, 500);
-            };
         }
 
         private void SetupModernStyle()
         {
-            // Только скругление углов без обводки
             this.Paint += (s, e) =>
             {
                 GraphicsPath path = new GraphicsPath();
@@ -270,26 +357,21 @@ namespace MaxLight
 
         private void LoadAutoStartState()
         {
+            if (_isPortable)
+            {
+                chkAutoStart.Checked = false;
+                return;
+            }
+
             chkAutoStart.Checked = IsAutoStartEnabled();
         }
 
         private void LoadNotificationsOnTopState()
         {
-            // Загружаем сохраненную настройку из реестра
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\MaxLight"))
-                {
-                    if (key != null)
-                    {
-                        int value = (int)key.GetValue("NotificationsOnTop", 1);
-                        chkNotificationsOnTop.Checked = value == 1;
-                    }
-                    else
-                    {
-                        chkNotificationsOnTop.Checked = true; // По умолчанию true
-                    }
-                }
+                bool isOnTop = ConfigManager.GetNotificationsOnTop();
+                chkNotificationsOnTop.Checked = isOnTop;
             }
             catch
             {
@@ -297,14 +379,136 @@ namespace MaxLight
             }
         }
 
+        private void LoadProxySettings()
+        {
+            try
+            {
+                var proxy = ConfigManager.GetProxySettings();
+                _originalProxySettings = proxy != null ? new ConfigManager.ProxySettings
+                {
+                    Enabled = proxy.Enabled,
+                    Server = proxy.Server,
+                    Port = proxy.Port
+                } : null;
+
+                if (proxy != null)
+                {
+                    chkProxyEnabled.Checked = proxy.Enabled;
+                    txtProxyServer.Text = proxy.Server ?? "";
+                    numProxyPort.Value = proxy.Port > 0 ? proxy.Port : 8080;
+                }
+                else
+                {
+                    chkProxyEnabled.Checked = false;
+                    txtProxyServer.Text = "";
+                    numProxyPort.Value = 8080;
+                }
+
+                // Обновляем состояние полей
+                txtProxyServer.Enabled = chkProxyEnabled.Checked;
+                numProxyPort.Enabled = chkProxyEnabled.Checked;
+                btnApplyProxy.Enabled = false;
+            }
+            catch
+            {
+                chkProxyEnabled.Checked = false;
+                txtProxyServer.Text = "";
+                numProxyPort.Value = 8080;
+                txtProxyServer.Enabled = false;
+                numProxyPort.Enabled = false;
+                btnApplyProxy.Enabled = false;
+                _originalProxySettings = null;
+            }
+        }
+
+        private bool HasProxySettingsChanged()
+        {
+            bool currentEnabled = chkProxyEnabled.Checked;
+            string currentServer = txtProxyServer.Text.Trim();
+            int currentPort = (int)numProxyPort.Value;
+
+            if (_originalProxySettings == null)
+            {
+                return currentEnabled || !string.IsNullOrEmpty(currentServer) || currentPort != 8080;
+            }
+
+            return _originalProxySettings.Enabled != currentEnabled ||
+                   _originalProxySettings.Server != currentServer ||
+                   _originalProxySettings.Port != currentPort;
+        }
+
+        private void ApplyProxySettings()
+        {
+            try
+            {
+                // Проверяем, изменились ли настройки
+                if (!HasProxySettingsChanged())
+                {
+                    System.Diagnostics.Debug.WriteLine("ℹ️ Настройки прокси не изменились");
+                    this.Close();
+                    return;
+                }
+
+                bool enabled = chkProxyEnabled.Checked;
+                string server = txtProxyServer.Text.Trim();
+                int port = (int)numProxyPort.Value;
+
+                // ВАЛИДАЦИЯ: если прокси включен, но сервер пустой или порт 0 - отключаем
+                if (enabled && (string.IsNullOrEmpty(server) || port <= 0))
+                {
+                    var result = MessageBox.Show(
+                        "Для использования прокси необходимо указать сервер и порт.\n" +
+                        "Отключить прокси?",
+                        "Неверные настройки прокси",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        enabled = false;
+                        chkProxyEnabled.Checked = false;
+                        txtProxyServer.Enabled = false;
+                        numProxyPort.Enabled = false;
+                    }
+                    else
+                    {
+                        return; // Не сохраняем, остаемся в настройках
+                    }
+                }
+
+                // Сохраняем настройки
+                ConfigManager.SaveProxySettings(enabled, server, port);
+
+                System.Diagnostics.Debug.WriteLine($"🌐 Настройки прокси сохранены: {enabled}");
+
+                // Если настройки изменились и прокси включен - перезапускаем
+                ProxySettingsChanged?.Invoke();
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка сохранения настроек прокси: {ex.Message}",
+                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         public void SetAutoStartChecked(bool enabled)
         {
+            if (_isPortable) return;
             chkAutoStart.Checked = enabled;
         }
 
         public void SetNotificationsOnTopChecked(bool enabled)
         {
             chkNotificationsOnTop.Checked = enabled;
+        }
+
+        public void SetProxySettings(bool enabled, string server, int port)
+        {
+            chkProxyEnabled.Checked = enabled;
+            txtProxyServer.Text = server;
+            numProxyPort.Value = port;
+            btnApplyProxy.Enabled = false;
         }
     }
 }

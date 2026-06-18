@@ -32,9 +32,6 @@ namespace MaxLight
         private bool _tokenParserActive = false;
         private bool _authRestored = false;
 
-        // Константы для хранения данных авторизации в реестре
-        private const string AUTH_REGISTRY_PATH = "SOFTWARE\\MaxLight\\Auth";
-
         // Поля для подсветки иконки в панели задач
         private Timer notificationFlashTimer;
         private bool isAttentionRequired = false;
@@ -98,25 +95,34 @@ namespace MaxLight
             {
                 try
                 {
-                    using (var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\MaxLight\\WindowState"))
+                    var state = ConfigManager.GetWindowState();
+                    if (state != null && state.Left != -1 && state.Top != -1 && this.WindowState != FormWindowState.Maximized)
                     {
-                        if (key != null)
-                        {
-                            int x = (int)key.GetValue("Left", -1);
-                            int y = (int)key.GetValue("Top", -1);
-                            if (x != -1 && y != -1 && this.WindowState != FormWindowState.Maximized)
-                            {
-                                this.Location = new Point(x, y);
-                            }
-                        }
+                        this.Location = new Point(state.Left, state.Top);
                     }
                 }
                 catch { }
             };
+
+            // Обработка аргументов командной строки для активации
+            CheckActivationArgs();
         }
 
         private void InitializeForm()
         {
+            // ========== МИГРАЦИЯ ИЗ РЕЕСТРА ==========
+            try
+            {
+                if (ConfigManager.MigrateFromRegistry())
+                {
+                    System.Diagnostics.Debug.WriteLine("✅ Миграция из реестра в config.json выполнена");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка миграции: {ex.Message}");
+            }
+
             this.SetStyle(ControlStyles.AllPaintingInWmPaint |
                   ControlStyles.UserPaint |
                   ControlStyles.DoubleBuffer |
@@ -135,6 +141,32 @@ namespace MaxLight
             {
                 try { this.Icon = new Icon(iconPath); } catch { }
             }
+        }
+
+        private void CheckActivationArgs()
+        {
+            var args = Environment.GetCommandLineArgs();
+            foreach (var arg in args)
+            {
+                if (arg.Equals("--activate", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Активируем окно
+                    if (this.WindowState == FormWindowState.Minimized)
+                    {
+                        this.WindowState = FormWindowState.Normal;
+                    }
+                    this.Show();
+                    this.Activate();
+                    this.BringToFront();
+                    break;
+                }
+            }
+        }
+
+        private bool IsPortableMode()
+        {
+            var args = Environment.GetCommandLineArgs();
+            return args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase));
         }
 
         private void Form1_Resize(object sender, EventArgs e)
@@ -475,33 +507,26 @@ namespace MaxLight
             {
                 if (WindowState == FormWindowState.Minimized) return;
 
-                using (var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\MaxLight\\WindowState"))
+                int width, height, left, top;
+                if (WindowState == FormWindowState.Normal)
                 {
-                    int width, height, left, top;
-                    if (WindowState == FormWindowState.Normal)
-                    {
-                        width = this.Width;
-                        height = this.Height;
-                        left = this.Left;
-                        top = this.Top;
-                    }
-                    else
-                    {
-                        width = this.RestoreBounds.Width;
-                        height = this.RestoreBounds.Height;
-                        left = this.RestoreBounds.Left;
-                        top = this.RestoreBounds.Top;
-                    }
-
-                    width = Math.Max(width, MinimumSize.Width);
-                    height = Math.Max(height, MinimumSize.Height);
-
-                    key.SetValue("Width", width);
-                    key.SetValue("Height", height);
-                    key.SetValue("Left", left);
-                    key.SetValue("Top", top);
-                    key.SetValue("WindowState", (int)WindowState);
+                    width = this.Width;
+                    height = this.Height;
+                    left = this.Left;
+                    top = this.Top;
                 }
+                else
+                {
+                    width = this.RestoreBounds.Width;
+                    height = this.RestoreBounds.Height;
+                    left = this.RestoreBounds.Left;
+                    top = this.RestoreBounds.Top;
+                }
+
+                width = Math.Max(width, MinimumSize.Width);
+                height = Math.Max(height, MinimumSize.Height);
+
+                ConfigManager.SaveWindowState(width, height, left, top, (int)WindowState);
             }
             catch { }
         }
@@ -510,49 +535,41 @@ namespace MaxLight
         {
             try
             {
-                using (var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\MaxLight\\WindowState"))
+                var state = ConfigManager.GetWindowState();
+                if (state == null)
                 {
-                    if (key == null)
-                    {
-                        this.StartPosition = FormStartPosition.CenterScreen;
-                        return;
-                    }
+                    this.StartPosition = FormStartPosition.CenterScreen;
+                    return;
+                }
 
-                    int w = (int)key.GetValue("Width", 900);
-                    int h = (int)key.GetValue("Height", 700);
-                    int x = (int)key.GetValue("Left", -1);
-                    int y = (int)key.GetValue("Top", -1);
-                    int state = (int)key.GetValue("WindowState", 0);
-
-                    bool isValidPosition = false;
-                    if (x != -1 && y != -1)
+                bool isValidPosition = false;
+                if (state.Left != -1 && state.Top != -1)
+                {
+                    foreach (Screen screen in Screen.AllScreens)
                     {
-                        foreach (Screen screen in Screen.AllScreens)
+                        if (state.Left + 50 > screen.Bounds.Left && state.Left - 50 < screen.Bounds.Right &&
+                            state.Top + 50 > screen.Bounds.Top && state.Top - 50 < screen.Bounds.Bottom)
                         {
-                            if (x + 50 > screen.Bounds.Left && x - 50 < screen.Bounds.Right &&
-                                y + 50 > screen.Bounds.Top && y - 50 < screen.Bounds.Bottom)
-                            {
-                                isValidPosition = true;
-                                break;
-                            }
+                            isValidPosition = true;
+                            break;
                         }
                     }
+                }
 
-                    if (w >= MinimumSize.Width && h >= MinimumSize.Height && isValidPosition)
-                    {
-                        this.StartPosition = FormStartPosition.Manual;
-                        this.Size = new Size(w, h);
-                        this.Location = new Point(x, y);
-                    }
-                    else
-                    {
-                        this.StartPosition = FormStartPosition.CenterScreen;
-                    }
+                if (state.Width >= MinimumSize.Width && state.Height >= MinimumSize.Height && isValidPosition)
+                {
+                    this.StartPosition = FormStartPosition.Manual;
+                    this.Size = new Size(state.Width, state.Height);
+                    this.Location = new Point(state.Left, state.Top);
+                }
+                else
+                {
+                    this.StartPosition = FormStartPosition.CenterScreen;
+                }
 
-                    if (state == 1)
-                    {
-                        this.WindowState = FormWindowState.Maximized;
-                    }
+                if (state.State == 1)
+                {
+                    this.WindowState = FormWindowState.Maximized;
                 }
             }
             catch
@@ -583,6 +600,7 @@ namespace MaxLight
                 _normalIcon?.Dispose();
                 _unreadIcon?.Dispose();
 
+                // ВСЕГДА удаляем папку WebView2
                 if (!string.IsNullOrEmpty(tempUserDataFolder) && Directory.Exists(tempUserDataFolder))
                 {
                     try
@@ -623,6 +641,21 @@ namespace MaxLight
             settingsForm.PinSettingsClicked += ShowPinSettings;
             settingsForm.LogoutClicked += async () => await Logout();
             settingsForm.AboutClicked += ShowAbout;
+
+            // Подписываемся на событие изменения прокси
+            settingsForm.ProxySettingsChanged += () =>
+            {
+                System.Diagnostics.Debug.WriteLine("🔄 Перезапуск приложения для применения прокси...");
+                // Показываем сообщение пользователю
+                MessageBox.Show(
+                    "Настройки прокси применены. Для полного применения требуется перезапуск программы.",
+                    "Перезапуск",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                Application.Restart();
+                Environment.Exit(0);
+            };
+
             settingsForm.ShowDialog(this);
         }
 
@@ -637,8 +670,8 @@ namespace MaxLight
 
         private void CreateWebView()
         {
-            tempUserDataFolder = Path.Combine(Path.GetTempPath(), "MaxLight_" + Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempUserDataFolder);
+            string userDataFolder = GetWebViewUserDataFolder();
+            tempUserDataFolder = userDataFolder; // Сохраняем для очистки
 
             webView = new WebView2
             {
@@ -650,17 +683,47 @@ namespace MaxLight
             this.Load += (s, e) => UpdateWebViewPosition();
             this.Resize += (s, e) => UpdateWebViewPosition();
 
-            _ = InitializeWebViewAsync(tempUserDataFolder);
+            _ = InitializeWebViewAsync(userDataFolder);
+        }
+
+        private string GetWebViewUserDataFolder()
+        {
+            
+            string dataFolder = Path.Combine(Application.StartupPath, "WebView2Data");
+
+            if (!Directory.Exists(dataFolder))
+            {
+                Directory.CreateDirectory(dataFolder);
+            }
+
+            return dataFolder;
         }
 
         private async Task InitializeWebViewAsync(string userDataFolder)
         {
             try
             {
+                // Создаем опции
                 var options = new CoreWebView2EnvironmentOptions
                 {
                     AdditionalBrowserArguments = "--inprivate"
                 };
+
+                // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА ПРОКСИ
+                var proxyConfig = ConfigManager.GetProxySettings();
+                if (proxyConfig?.Enabled == true &&
+                    !string.IsNullOrEmpty(proxyConfig.Server) &&
+                    proxyConfig.Port > 0)
+                {
+                    options.AdditionalBrowserArguments += $" --proxy-server={proxyConfig.Server}:{proxyConfig.Port}";
+                    System.Diagnostics.Debug.WriteLine($"🌐 Прокси настроен: {proxyConfig.Server}:{proxyConfig.Port}");
+                }
+                else if (proxyConfig?.Enabled == true)
+                {
+                    // Если прокси включен, но параметры некорректны - отключаем
+                    System.Diagnostics.Debug.WriteLine("⚠️ Прокси отключен: некорректные параметры в config.json");
+                    ConfigManager.SaveProxySettings(false, "", 0);
+                }
 
                 var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
                 await webView.EnsureCoreWebView2Async(env);
@@ -681,7 +744,7 @@ namespace MaxLight
                     _authRestored = true;
                 }
 
-                // Блок инфобаара (верхня строка с рекламой всякой херни)
+                // Блок инфобаара (верхняя строка с рекламой)
                 await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("setInterval(()=>{const e=document.querySelector('.infobar.svelte-1aijhs3');if(e)e.remove()},100);");
 
                 // ========== 2. ЗАЩИТА ОТ XSS ==========
@@ -726,7 +789,35 @@ namespace MaxLight
                     }
                     else if (!isLoadingCompleted)
                     {
-                        ShowConnectionError();
+                        // Проверяем, может быть проблема с прокси
+                        var proxyConfig2 = ConfigManager.GetProxySettings();
+                        if (proxyConfig2?.Enabled == true &&
+                            !string.IsNullOrEmpty(proxyConfig2.Server) &&
+                            proxyConfig2.Port > 0)
+                        {
+                            var result = MessageBox.Show(
+                                "Не удалось подключиться через прокси-сервер.\n" +
+                                $"Адрес: {proxyConfig2.Server}:{proxyConfig2.Port}\n\n" +
+                                "Проверьте настройки или отключите прокси.",
+                                "Ошибка подключения",
+                                MessageBoxButtons.RetryCancel,
+                                MessageBoxIcon.Warning);
+
+                            if (result == DialogResult.Retry)
+                            {
+                                ShowSettings();
+                            }
+                            else
+                            {
+                                // Отключаем прокси и перезагружаем
+                                ConfigManager.SaveProxySettings(false, "", 0);
+                                await ReinitializeWebView();
+                            }
+                        }
+                        else
+                        {
+                            ShowConnectionError();
+                        }
                     }
                 };
 
@@ -741,7 +832,6 @@ namespace MaxLight
             }
         }
 
-        
         private string GetTokenInterceptorScript()
         {
             return @"
@@ -835,36 +925,32 @@ namespace MaxLight
         {
             try
             {
-                using (var key = Registry.CurrentUser.OpenSubKey(AUTH_REGISTRY_PATH))
+                var authData = ConfigManager.GetAuth();
+                if (authData == null || string.IsNullOrEmpty(authData.Token)) return false;
+
+                _currentAuthData = new AuthData
                 {
-                    if (key == null) return false;
+                    token = authData.Token,
+                    viewerId = authData.ViewerId,
+                    deviceId = authData.DeviceId,
+                    savedAt = authData.SavedAt
+                };
 
-                    string encrypted = key.GetValue("AuthData")?.ToString();
-                    if (string.IsNullOrEmpty(encrypted)) return false;
+                string escapedToken = EscapeJsString(authData.Token);
+                string escapedDeviceId = EscapeJsString(authData.DeviceId ?? "");
+                string authObjectJson = $"{{\"token\":\"{escapedToken}\",\"viewerId\":{authData.ViewerId ?? 0}}}";
+                string escapedAuthObject = EscapeJsString(authObjectJson);
 
-                    string json = DecryptData(encrypted);
-                    var authData = JsonConvert.DeserializeObject<AuthData>(json);
-
-                    if (authData == null || string.IsNullOrEmpty(authData.token)) return false;
-
-                    _currentAuthData = authData;
-
-                    string escapedToken = EscapeJsString(authData.token);
-                    string escapedDeviceId = EscapeJsString(authData.deviceId ?? "");
-                    string authObjectJson = $"{{\"token\":\"{escapedToken}\",\"viewerId\":{authData.viewerId ?? 0}}}";
-                    string escapedAuthObject = EscapeJsString(authObjectJson);
-
-                    string injectionScript = $@"
+                string injectionScript = $@"
                         localStorage.setItem('__oneme_auth', '{escapedAuthObject}');
                         localStorage.setItem('__oneme_device_id', '{escapedDeviceId}');
-                        console.log('Данные авторизации восстановлены из реестра');
+                        console.log('Данные авторизации восстановлены из config.json');
                     ";
 
-                    await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(injectionScript);
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(injectionScript);
 
-                    System.Diagnostics.Debug.WriteLine("Токен и deviceId восстановлены из реестра");
-                    return true;
-                }
+                System.Diagnostics.Debug.WriteLine("Токен и deviceId восстановлены из config.json");
+                return true;
             }
             catch (Exception ex)
             {
@@ -872,8 +958,6 @@ namespace MaxLight
                 return false;
             }
         }
-
-        
 
         private async Task StopTokenParser()
         {
@@ -910,6 +994,47 @@ namespace MaxLight
             }
         }
 
+        // ========== ПЕРЕИНИЦИАЛИЗАЦИЯ WEBVIEW2  ==========
+        private async Task ReinitializeWebView()
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+
+                // 1. Останавливаем текущий WebView2
+                if (webView != null)
+                {
+                    if (webView.CoreWebView2 != null)
+                    {
+                        webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
+                        webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+                        webView.CoreWebView2.Stop();
+                    }
+
+                    this.Controls.Remove(webView);
+                    webView.Dispose();
+                    webView = null;
+                }
+
+                // 2. Пересоздаем с новыми настройками
+                CreateWebView();
+
+                // 3. Ждем загрузки
+                await Task.Delay(1000);
+
+                this.Cursor = Cursors.Default;
+
+                // Уведомляем пользователя
+                CustomNotification.Show("Max Light", "✅ Настройки прокси применены", null, null);
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+                MessageBox.Show($"Ошибка применения настроек: {ex.Message}", "Ошибка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         #endregion
 
         #region Управление авторизацией
@@ -918,20 +1043,7 @@ namespace MaxLight
         {
             try
             {
-                string json = JsonConvert.SerializeObject(new
-                {
-                    token = token,
-                    viewerId = viewerId,
-                    deviceId = deviceId,
-                    savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                });
-
-                string encrypted = EncryptData(json);
-
-                using (var key = Registry.CurrentUser.CreateSubKey(AUTH_REGISTRY_PATH))
-                {
-                    key.SetValue("AuthData", encrypted);
-                }
+                ConfigManager.SaveAuth(token, viewerId, deviceId);
 
                 _currentAuthData = new AuthData
                 {
@@ -941,7 +1053,7 @@ namespace MaxLight
                     savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 };
 
-                System.Diagnostics.Debug.WriteLine("Токен и deviceId сохранены в реестр");
+                System.Diagnostics.Debug.WriteLine("Токен и deviceId сохранены в config.json");
             }
             catch (Exception ex)
             {
@@ -959,18 +1071,12 @@ namespace MaxLight
                     return;
                 }
 
+                ConfigManager.UpdateDeviceId(deviceId);
+
                 _currentAuthData.deviceId = deviceId;
                 _currentAuthData.savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
-                string json = JsonConvert.SerializeObject(_currentAuthData);
-                string encrypted = EncryptData(json);
-
-                using (var key = Registry.CurrentUser.CreateSubKey(AUTH_REGISTRY_PATH))
-                {
-                    key.SetValue("AuthData", encrypted);
-                }
-
-                System.Diagnostics.Debug.WriteLine($"DeviceId обновлён в реестре: {deviceId}");
+                System.Diagnostics.Debug.WriteLine($"DeviceId обновлён в config.json: {deviceId}");
             }
             catch (Exception ex)
             {
@@ -982,14 +1088,8 @@ namespace MaxLight
         {
             try
             {
-                // Просто удаляем ветку по полному пути
-                Registry.CurrentUser.DeleteSubKeyTree("SOFTWARE\\MaxLight");
-                System.Diagnostics.Debug.WriteLine("✅ Ветка MaxLight полностью удалена");
-            }
-            catch (ArgumentException)
-            {
-                // Ветка не существует — это не ошибка
-                System.Diagnostics.Debug.WriteLine("⚠️ Ветка MaxLight не существовала");
+                ConfigManager.ClearAuth();
+                System.Diagnostics.Debug.WriteLine("✅ Данные авторизации удалены из config.json");
             }
             catch (Exception ex)
             {
@@ -1263,6 +1363,13 @@ namespace MaxLight
 
         private void ToggleAutoStart()
         {
+            // Если portable - ничего не делаем
+            if (IsPortableMode())
+            {
+                System.Diagnostics.Debug.WriteLine("⏸️ Portable режим: автозапуск недоступен");
+                return;
+            }
+
             bool enabled = !IsAutoStartEnabled();
             SetAutoStart(enabled);
         }
@@ -1288,52 +1395,25 @@ namespace MaxLight
 
         #endregion
 
-        #region PIN-код и шифрование
-
-        private string EncryptData(string data)
-        {
-            if (string.IsNullOrEmpty(data)) return null;
-            byte[] dataBytes = Encoding.UTF8.GetBytes(data);
-            byte[] encryptedBytes = ProtectedData.Protect(dataBytes, null, DataProtectionScope.CurrentUser);
-            return Convert.ToBase64String(encryptedBytes);
-        }
-
-        private string DecryptData(string encryptedBase64)
-        {
-            if (string.IsNullOrEmpty(encryptedBase64)) return null;
-            byte[] encryptedBytes = Convert.FromBase64String(encryptedBase64);
-            byte[] decryptedBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(decryptedBytes);
-        }
+        #region PIN-код
 
         private string GetSavedPin()
         {
             try
             {
-                using (var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\MaxLight", false))
-                {
-                    string enc = key?.GetValue("PIN")?.ToString();
-                    return enc == null ? null : DecryptData(enc);
-                }
+                return ConfigManager.GetPin();
             }
             catch { return null; }
         }
 
         private void SavePin(string pin)
         {
-            string encrypted = EncryptData(pin);
-            using (var key = Registry.CurrentUser.CreateSubKey("SOFTWARE\\MaxLight"))
-            {
-                key.SetValue("PIN", encrypted);
-            }
+            ConfigManager.SavePin(pin);
         }
 
         private void DeletePin()
         {
-            using (var key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\MaxLight", true))
-            {
-                key?.DeleteValue("PIN", false);
-            }
+            ConfigManager.DeletePin();
         }
 
         private bool CheckPinOnStartup()
@@ -1342,10 +1422,8 @@ namespace MaxLight
             if (string.IsNullOrEmpty(pin))
             {
                 bool wasProgramRunBefore = false;
-                using (var key = Registry.CurrentUser.OpenSubKey(AUTH_REGISTRY_PATH, false))
-                {
-                    wasProgramRunBefore = key?.GetValue("AuthData") != null;
-                }
+                var authData = ConfigManager.GetAuth();
+                wasProgramRunBefore = authData != null;
 
                 if (!wasProgramRunBefore)
                 {
@@ -1577,25 +1655,7 @@ namespace MaxLight
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\MaxLight"))
-                {
-                    if (key != null)
-                    {
-                        object value = key.GetValue("NotificationsOnTop");
-                        if (value != null && value is int)
-                        {
-                            CustomNotification.AlwaysOnTop = ((int)value) == 1;
-                        }
-                        else
-                        {
-                            CustomNotification.AlwaysOnTop = true; // По умолчанию true
-                        }
-                    }
-                    else
-                    {
-                        CustomNotification.AlwaysOnTop = true;
-                    }
-                }
+                CustomNotification.AlwaysOnTop = ConfigManager.GetNotificationsOnTop();
             }
             catch
             {
@@ -1607,27 +1667,20 @@ namespace MaxLight
 
         private void ToggleNotificationsOnTop(bool isOnTop)
         {
-            // Сохраняем в реестр
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\MaxLight"))
-                {
-                    key.SetValue("NotificationsOnTop", isOnTop ? 1 : 0);
-                }
+                ConfigManager.SaveNotificationsOnTop(isOnTop);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Ошибка сохранения настройки: {ex.Message}");
             }
 
-            // Обновляем глобальную настройку для будущих уведомлений
             CustomNotification.AlwaysOnTop = isOnTop;
-
             System.Diagnostics.Debug.WriteLine($"🔔 Настройка уведомлений изменена: TopMost = {isOnTop}");
         }
 
         #endregion
-
     }
 
     internal class AuthData

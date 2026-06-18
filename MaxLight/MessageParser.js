@@ -50,7 +50,7 @@
             var avatarImg = chatElement.querySelector('img.avatarImage.svelte-1aizpza');
             if (avatarImg && avatarImg.src) {
                 var avatarUrl = avatarImg.src;
-                console.log('🖼️ Найдена аватарка:', avatarUrl);
+               // console.log('🖼️ Найдена аватарка:', avatarUrl);
                 return avatarUrl;
             }
 
