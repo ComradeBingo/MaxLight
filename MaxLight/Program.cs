@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -23,18 +24,42 @@ namespace MaxLight
                 var args = Environment.GetCommandLineArgs();
                 bool isPortable = args.Any(a => a.Equals(PORTABLE_ARG, StringComparison.OrdinalIgnoreCase));
 
-                // Проверяем, не запущена ли уже копия (только для обычной версии)
-                if (!isPortable && IsAnotherInstanceRunning())
+                // ===== ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА PORTABLE =====
+                // Проверяем имя файла и наличие .portable
+                if (!isPortable)
                 {
-                    ActivateExistingInstance();
-                    return;
+                    string exeName = Path.GetFileName(Application.ExecutablePath);
+                    if (exeName.Contains(".portable.exe"))
+                        isPortable = true;
+                }
+                if (!isPortable)
+                {
+                    string portableFile = Path.Combine(Application.StartupPath, ".portable");
+                    if (File.Exists(portableFile))
+                        isPortable = true;
                 }
 
-                // Для обычной версии создаем мьютекс
-                if (!isPortable && !TryCreateMutex())
+                // ===== PORTABLE ВЕРСИЯ: ПРОПУСКАЕМ ПРОВЕРКУ =====
+                if (!isPortable)
                 {
-                    ActivateExistingInstance();
-                    return;
+                    // Проверяем, не запущена ли уже копия (ТОЛЬКО для обычной версии)
+                    if (IsAnotherInstanceRunning())
+                    {
+                        ActivateExistingInstance();
+                        return;
+                    }
+
+                    // Для обычной версии создаем мьютекс
+                    if (!TryCreateMutex())
+                    {
+                        ActivateExistingInstance();
+                        return;
+                    }
+                }
+                else
+                {
+                    // Portable версия - логируем, что запущена в портативном режиме
+                    Debug.WriteLine("📁 Запуск в Portable режиме (несколько экземпляров разрешены)");
                 }
 
                 // Инициализация Velopack
@@ -47,7 +72,7 @@ namespace MaxLight
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new Form1());
 
-                // Освобождаем мьютекс при выходе
+                // Освобождаем мьютекс при выходе (только если он был создан)
                 ReleaseMutex();
             }
             catch (Exception ex)
@@ -168,7 +193,6 @@ namespace MaxLight
                     // Загружаем release notes с GitHub
                     string releaseNotes = await GetReleaseNotesFromGitHub(versionText);
 
-                    // Создаем форму для отображения релиз-ноутов
                     using (var updateForm = new UpdateDialog(versionText, releaseNotes, portableHint))
                     {
                         var result = updateForm.ShowDialog();
@@ -187,20 +211,15 @@ namespace MaxLight
             }
         }
 
-        /// <summary>
-        /// Загружает release notes с GitHub по тегу версии
-        /// </summary>
         private static async Task<string> GetReleaseNotesFromGitHub(string version)
         {
             try
             {
-                // Формируем тег (например, v1.0.0)
                 string tag = version.StartsWith("v") ? version : $"v{version}";
                 string apiUrl = $"https://api.github.com/repos/ComradeBingo/MaxLight/releases/tags/{tag}";
 
                 using (var client = new HttpClient())
                 {
-                    // GitHub API требует User-Agent
                     client.DefaultRequestHeaders.Add("User-Agent", "MaxLight-App");
 
                     var response = await client.GetAsync(apiUrl);
