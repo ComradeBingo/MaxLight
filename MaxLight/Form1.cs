@@ -10,8 +10,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Timer = System.Windows.Forms.Timer;
 
 namespace MaxLight
 {
@@ -45,14 +47,26 @@ namespace MaxLight
         // ========== PORTABLE РЕЖИМ ==========
         private bool _isPortable;
 
+        // ========== EVENT WAIT HANDLE ДЛЯ АКТИВАЦИИ ==========
+        private EventWaitHandle _activateEvent;
+        private CancellationTokenSource _cts;
+
         private readonly string[] _trackingKeywords = new[]
         {
             "analytics", "apptracer", "perf/", "sdk-api",
             "adsystem", "crashtoken", "crash", "track"
         };
 
-        public Form1()
+        // Существующий конструктор (для совместимости)
+        public Form1() : this(null)
         {
+        }
+
+        // Новый конструктор с EventWaitHandle
+        public Form1(EventWaitHandle activateEvent)
+        {
+            _activateEvent = activateEvent;
+
             // ========== ОПРЕДЕЛЯЕМ PORTABLE РЕЖИМ ==========
             _isPortable = IsPortableMode();
             System.Diagnostics.Debug.WriteLine($"📁 Portable режим: {_isPortable}");
@@ -113,6 +127,13 @@ namespace MaxLight
 
             // Обработка аргументов командной строки для активации
             CheckActivationArgs();
+
+            // Запускаем поток для ожидания сигнала активации
+            if (_activateEvent != null)
+            {
+                _cts = new CancellationTokenSource();
+                Task.Run(() => WaitForActivationSignal(_cts.Token));
+            }
         }
 
         private void InitializeForm()
@@ -150,6 +171,29 @@ namespace MaxLight
             }
         }
 
+        private void WaitForActivationSignal(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (_activateEvent.WaitOne(1000))
+                    {
+                        // Получили сигнал - активируем окно
+                        this.BeginInvoke(new Action(() => ActivateWindow()));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка в WaitForActivationSignal: {ex.Message}");
+                }
+            }
+        }
+
         private void CheckActivationArgs()
         {
             var args = Environment.GetCommandLineArgs();
@@ -157,16 +201,47 @@ namespace MaxLight
             {
                 if (arg.Equals("--activate", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Активируем окно
-                    if (this.WindowState == FormWindowState.Minimized)
-                    {
-                        this.WindowState = FormWindowState.Normal;
-                    }
-                    this.Show();
-                    this.Activate();
-                    this.BringToFront();
+                    // Активируем окно через BeginInvoke (чтобы избежать проблем с потоками)
+                    this.BeginInvoke(new Action(() => ActivateWindow()));
                     break;
                 }
+            }
+        }
+
+        private async void ActivateWindow()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("🔄 Активация окна...");
+
+                // Если окно скрыто (в трее) - показываем
+                if (!this.Visible)
+                {
+                    this.Show();
+                    this.ShowInTaskbar = true;
+                }
+
+                // Если окно свернуто - разворачиваем
+                if (this.WindowState == FormWindowState.Minimized)
+                {
+                    this.WindowState = FormWindowState.Normal;
+                }
+
+                // Поднимаем на передний план
+                this.Activate();
+                this.BringToFront();
+                this.TopMost = true;
+                await Task.Delay(100);
+                this.TopMost = false;
+
+                // Фокусируем WebView
+                webView?.Focus();
+
+                System.Diagnostics.Debug.WriteLine("✅ Окно активировано");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Ошибка активации окна: {ex.Message}");
             }
         }
 
@@ -177,19 +252,9 @@ namespace MaxLight
             if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
                 return true;
 
-            // Проверяем наличие файла .portable в текущей папке
+            // Проверяем наличие файла .portable
             string portableFile = Path.Combine(Application.StartupPath, ".portable");
             if (File.Exists(portableFile))
-                return true;
-
-            // Проверяем наличие файла .portable в папке выше (для Velopack portable структуры)
-            string parentPortableFile = Path.Combine(Path.GetDirectoryName(Application.StartupPath) ?? "", ".portable");
-            if (File.Exists(parentPortableFile))
-                return true;
-
-            // Проверяем наличие файла .portable в папке current (для Velopack portable структуры)
-            string currentPortableFile = Path.Combine(Application.StartupPath, "current", ".portable");
-            if (File.Exists(currentPortableFile))
                 return true;
 
             return false;
@@ -613,6 +678,11 @@ namespace MaxLight
             }
             else
             {
+                // Отменяем Task
+                _cts?.Cancel();
+                _cts?.Dispose();
+                _activateEvent?.Dispose();
+
                 SaveWindowState();
 
                 if (trayIcon != null)
@@ -626,7 +696,19 @@ namespace MaxLight
                 _normalIcon?.Dispose();
                 _unreadIcon?.Dispose();
 
-               
+                // ВСЕГДА удаляем папку WebView2
+                if (!string.IsNullOrEmpty(tempUserDataFolder) && Directory.Exists(tempUserDataFolder))
+                {
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"🗑️ Удаляем папку WebView2: {tempUserDataFolder}");
+                        await Task.Run(() => Directory.Delete(tempUserDataFolder, true));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"⚠️ Ошибка удаления папки WebView2: {ex.Message}");
+                    }
+                }
 
                 if (webView != null && webView.CoreWebView2 != null)
                 {

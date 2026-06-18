@@ -107,7 +107,6 @@
     <Compile Include="SettingsForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="SingleInstanceManager.cs" />
     <Compile Include="TitleBar.cs">
       <SubType>Component</SubType>
     </Compile>

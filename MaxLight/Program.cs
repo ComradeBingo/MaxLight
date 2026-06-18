@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Newtonsoft.Json;
@@ -13,53 +14,30 @@ namespace MaxLight
 {
     internal static class Program
     {
-        private const string PORTABLE_ARG = "--portable";
+        private static EventWaitHandle _activateEvent;
 
         [STAThread]
         static void Main()
         {
             try
             {
-                // Проверяем аргументы командной строки
-                var args = Environment.GetCommandLineArgs();
-                bool isPortable = args.Any(a => a.Equals(PORTABLE_ARG, StringComparison.OrdinalIgnoreCase));
+                // Проверяем portable режим
+                bool isPortable = IsPortableMode();
 
-                // ===== ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА PORTABLE =====
-                // Проверяем имя файла и наличие .portable
+                // Проверяем, есть ли уже запущенный экземпляр (только для обычной версии)
                 if (!isPortable)
                 {
-                    string exeName = Path.GetFileName(Application.ExecutablePath);
-                    if (exeName.Contains(".portable.exe"))
-                        isPortable = true;
-                }
-                if (!isPortable)
-                {
-                    string portableFile = Path.Combine(Application.StartupPath, ".portable");
-                    if (File.Exists(portableFile))
-                        isPortable = true;
-                }
+                    bool createdNew;
+                    _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "MaxLight_ActivateEvent", out createdNew);
 
-                // ===== PORTABLE ВЕРСИЯ: ПРОПУСКАЕМ ПРОВЕРКУ =====
-                if (!isPortable)
-                {
-                    // Проверяем, не запущена ли уже копия (ТОЛЬКО для обычной версии)
-                    if (IsAnotherInstanceRunning())
+                    if (!createdNew)
                     {
-                        ActivateExistingInstance();
+                        // Сигнализируем существующему экземпляру
+                        _activateEvent.Set();
+                        Debug.WriteLine("📢 Сигнал активации отправлен существующему экземпляру");
+                        Thread.Sleep(500);
                         return;
                     }
-
-                    // Для обычной версии создаем мьютекс
-                    if (!TryCreateMutex())
-                    {
-                        ActivateExistingInstance();
-                        return;
-                    }
-                }
-                else
-                {
-                    // Portable версия - логируем, что запущена в портативном режиме
-                    Debug.WriteLine("📁 Запуск в Portable режиме (несколько экземпляров разрешены)");
                 }
 
                 // Инициализация Velopack
@@ -70,10 +48,13 @@ namespace MaxLight
 
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new Form1());
 
-                // Освобождаем мьютекс при выходе (только если он был создан)
-                ReleaseMutex();
+                // Создаем Form1 и передаем EventWaitHandle
+                var form1 = new Form1(_activateEvent);
+                Application.Run(form1);
+
+                // Освобождаем ресурсы
+                _activateEvent?.Dispose();
             }
             catch (Exception ex)
             {
@@ -82,99 +63,22 @@ namespace MaxLight
             }
         }
 
-        #region Single Instance Management
-
-        private static System.Threading.Mutex _mutex;
-        private const string MUTEX_NAME = "MaxLight_Instance_Mutex";
-
-        private static bool IsAnotherInstanceRunning()
+        private static bool IsPortableMode()
         {
-            try
-            {
-                var processes = Process.GetProcesses()
-                    .Where(p => p.ProcessName.Contains("MaxLight") &&
-                               p.Id != Process.GetCurrentProcess().Id);
+            var args = Environment.GetCommandLineArgs();
+            if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
+                return true;
 
-                // Проверяем, есть ли обычная версия (не portable)
-                var normalProcesses = processes.Where(p => !p.ProcessName.Contains("portable"));
-                if (normalProcesses.Any())
-                {
-                    return true;
-                }
+            string exeName = Path.GetFileName(Application.ExecutablePath);
+            if (exeName.Contains(".portable.exe"))
+                return true;
 
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            string portableFile = Path.Combine(Application.StartupPath, ".portable");
+            if (File.Exists(portableFile))
+                return true;
+
+            return false;
         }
-
-        private static bool TryCreateMutex()
-        {
-            try
-            {
-                string mutexId = $"{MUTEX_NAME}_{Environment.UserName}";
-                bool createdNew;
-                _mutex = new System.Threading.Mutex(true, mutexId, out createdNew);
-                return createdNew;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static void ReleaseMutex()
-        {
-            if (_mutex != null)
-            {
-                try
-                {
-                    _mutex.ReleaseMutex();
-                    _mutex.Dispose();
-                    _mutex = null;
-                }
-                catch { }
-            }
-        }
-
-        private static void ActivateExistingInstance()
-        {
-            try
-            {
-                var mainProcess = Process.GetProcesses()
-                    .Where(p => p.ProcessName.Contains("MaxLight") &&
-                               !p.ProcessName.Contains("portable") &&
-                               p.Id != Process.GetCurrentProcess().Id)
-                    .FirstOrDefault();
-
-                if (mainProcess != null && mainProcess.MainWindowHandle != IntPtr.Zero)
-                {
-                    ShowWindow(mainProcess.MainWindowHandle, SW_RESTORE);
-                    SetForegroundWindow(mainProcess.MainWindowHandle);
-                    FlashWindow(mainProcess.MainWindowHandle, true);
-                }
-                else
-                {
-                    var anyProcess = Process.GetProcesses()
-                        .Where(p => p.ProcessName.Contains("MaxLight") &&
-                                   p.Id != Process.GetCurrentProcess().Id)
-                        .FirstOrDefault();
-
-                    if (anyProcess != null && !string.IsNullOrEmpty(anyProcess.MainModule?.FileName))
-                    {
-                        Process.Start(anyProcess.MainModule.FileName, "--activate");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка активации окна: {ex.Message}");
-            }
-        }
-
-        #endregion
 
         #region Update Management
 
@@ -189,8 +93,6 @@ namespace MaxLight
                 {
                     string versionText = newVersion.TargetFullRelease.Version.ToString();
                     string portableHint = isPortable ? "\n(будет сохранена portable-версия)" : "";
-
-                    // Загружаем release notes с GitHub
                     string releaseNotes = await GetReleaseNotesFromGitHub(versionText);
 
                     using (var updateForm = new UpdateDialog(versionText, releaseNotes, portableHint))
@@ -221,21 +123,13 @@ namespace MaxLight
                 using (var client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "MaxLight-App");
-
                     var response = await client.GetAsync(apiUrl);
+
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync();
                         var releaseData = JsonConvert.DeserializeObject<GitHubRelease>(json);
-
-                        if (!string.IsNullOrEmpty(releaseData?.Body))
-                        {
-                            return releaseData.Body;
-                        }
-                        else
-                        {
-                            return "📝 Описание изменений не найдено.";
-                        }
+                        return !string.IsNullOrEmpty(releaseData?.Body) ? releaseData.Body : "📝 Описание изменений не найдено.";
                     }
                     else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
@@ -257,21 +151,6 @@ namespace MaxLight
                 return "⚠️ Ошибка загрузки описания изменений.";
             }
         }
-
-        #endregion
-
-        #region WinAPI Imports
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool FlashWindow(IntPtr hWnd, bool bInvert);
-
-        private const int SW_RESTORE = 9;
 
         #endregion
 
