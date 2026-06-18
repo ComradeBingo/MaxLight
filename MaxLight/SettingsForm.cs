@@ -41,10 +41,10 @@ namespace MaxLight
         // Сохраняем исходные настройки прокси при открытии
         private ConfigManager.ProxySettings _originalProxySettings;
 
-        public SettingsForm()
+        // Конструктор с параметром isPortable (по умолчанию false)
+        public SettingsForm(bool isPortable = false)
         {
-            // Определяем portable режим
-            _isPortable = IsPortableMode();
+            _isPortable = isPortable;
 
             InitializeForm();
             SetupModernStyle();
@@ -60,12 +60,6 @@ namespace MaxLight
                 chkAutoStart.Text = "Автоматический запуск\nнедоступен в portable-версии";
                 chkAutoStart.ForeColor = Color.Gray;
             }
-        }
-
-        private bool IsPortableMode()
-        {
-            var args = Environment.GetCommandLineArgs();
-            return args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase));
         }
 
         private void InitializeForm()

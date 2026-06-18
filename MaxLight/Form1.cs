@@ -42,6 +42,9 @@ namespace MaxLight
         private Icon _normalIcon;
         private Icon _unreadIcon;
 
+        // ========== PORTABLE РЕЖИМ ==========
+        private bool _isPortable;
+
         private readonly string[] _trackingKeywords = new[]
         {
             "analytics", "apptracer", "perf/", "sdk-api",
@@ -50,6 +53,10 @@ namespace MaxLight
 
         public Form1()
         {
+            // ========== ОПРЕДЕЛЯЕМ PORTABLE РЕЖИМ ==========
+            _isPortable = IsPortableMode();
+            System.Diagnostics.Debug.WriteLine($"📁 Portable режим: {_isPortable}");
+
             // ========== ПРОВЕРКА PIN ==========
             if (!CheckPinOnStartup())
             {
@@ -165,8 +172,17 @@ namespace MaxLight
 
         private bool IsPortableMode()
         {
+            // Проверяем аргументы командной строки
             var args = Environment.GetCommandLineArgs();
-            return args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase));
+            if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            // Проверяем наличие файла .portable
+            string portableFile = Path.Combine(Application.StartupPath, ".portable");
+            if (File.Exists(portableFile))
+                return true;
+
+            return false;
         }
 
         private void Form1_Resize(object sender, EventArgs e)
@@ -605,9 +621,13 @@ namespace MaxLight
                 {
                     try
                     {
+                        System.Diagnostics.Debug.WriteLine($"🗑️ Удаляем папку WebView2: {tempUserDataFolder}");
                         await Task.Run(() => Directory.Delete(tempUserDataFolder, true));
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"⚠️ Ошибка удаления папки WebView2: {ex.Message}");
+                    }
                 }
 
                 if (webView != null && webView.CoreWebView2 != null)
@@ -635,7 +655,7 @@ namespace MaxLight
 
         private void ShowSettings()
         {
-            var settingsForm = new SettingsForm();
+            var settingsForm = new SettingsForm(_isPortable);
             settingsForm.AutoStartToggled += ToggleAutoStart;
             settingsForm.NotificationsOnTopToggled += ToggleNotificationsOnTop;
             settingsForm.PinSettingsClicked += ShowPinSettings;
@@ -688,7 +708,7 @@ namespace MaxLight
 
         private string GetWebViewUserDataFolder()
         {
-            
+            // Для ВСЕХ версий - папка WebView2Data в папке с программой
             string dataFolder = Path.Combine(Application.StartupPath, "WebView2Data");
 
             if (!Directory.Exists(dataFolder))
@@ -696,6 +716,7 @@ namespace MaxLight
                 Directory.CreateDirectory(dataFolder);
             }
 
+            System.Diagnostics.Debug.WriteLine($"📁 Папка WebView2: {dataFolder}");
             return dataFolder;
         }
 
@@ -1364,7 +1385,7 @@ namespace MaxLight
         private void ToggleAutoStart()
         {
             // Если portable - ничего не делаем
-            if (IsPortableMode())
+            if (_isPortable)
             {
                 System.Diagnostics.Debug.WriteLine("⏸️ Portable режим: автозапуск недоступен");
                 return;
