@@ -788,8 +788,9 @@ namespace MaxLight
 
         private string GetWebViewUserDataFolder()
         {
-            // Для ВСЕХ версий - папка WebView2Data в папке с программой
-            string dataFolder = Path.Combine(Application.StartupPath, "WebView2Data");
+            // Для ВСЕХ версий - папка WebView2Data в родительской папке (на уровень выше current)
+            string parentFolder = Path.GetFullPath(Path.Combine(Application.StartupPath, ".."));
+            string dataFolder = Path.Combine(parentFolder, "WebView2Data");
 
             if (!Directory.Exists(dataFolder))
             {

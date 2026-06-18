@@ -10,8 +10,25 @@ namespace MaxLight
 {
     public class ConfigManager
     {
-        private static readonly string ConfigPath = Path.Combine(Application.StartupPath, "config.json");
         private static readonly object _lock = new object();
+
+        // ========== ПРАВИЛЬНЫЙ ПУТЬ К CONFIG.JSON ==========
+        private static string GetConfigPath()
+        {
+            // Получаем родительскую папку (на уровень выше current)
+            string appDataFolder = Path.GetFullPath(Path.Combine(Application.StartupPath, ".."));
+
+            // Создаем папку, если её нет
+            if (!Directory.Exists(appDataFolder))
+            {
+                Directory.CreateDirectory(appDataFolder);
+            }
+
+            string configPath = Path.Combine(appDataFolder, "config.json");
+
+            System.Diagnostics.Debug.WriteLine($"📁 Путь к config.json: {configPath}");
+            return configPath;
+        }
 
         public class ConfigData
         {
@@ -80,14 +97,16 @@ namespace MaxLight
         {
             lock (_lock)
             {
-                if (!File.Exists(ConfigPath))
+                string configPath = GetConfigPath();
+
+                if (!File.Exists(configPath))
                 {
                     return new ConfigData();
                 }
 
                 try
                 {
-                    string json = File.ReadAllText(ConfigPath);
+                    string json = File.ReadAllText(configPath);
                     return JsonConvert.DeserializeObject<ConfigData>(json) ?? new ConfigData();
                 }
                 catch
@@ -103,12 +122,14 @@ namespace MaxLight
             {
                 try
                 {
+                    string configPath = GetConfigPath();
                     string json = JsonConvert.SerializeObject(config, Formatting.Indented);
-                    File.WriteAllText(ConfigPath, json);
+                    File.WriteAllText(configPath, json);
+                    System.Diagnostics.Debug.WriteLine($"💾 Config сохранен: {configPath}");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Ошибка сохранения config.json: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"❌ Ошибка сохранения config.json: {ex.Message}");
                 }
             }
         }
@@ -240,14 +261,6 @@ namespace MaxLight
         public static void SaveProxySettings(bool enabled, string server, int port)
         {
             var config = LoadConfig();
-
-            // Если прокси включен, но сервер пустой или порт 0 - отключаем прокси
-            if (enabled && (string.IsNullOrEmpty(server) || port <= 0))
-            {
-                enabled = false;
-                System.Diagnostics.Debug.WriteLine("⚠️ Прокси отключен: некорректные параметры");
-            }
-
             config.Proxy = new ProxySettings
             {
                 Enabled = enabled,
@@ -257,19 +270,17 @@ namespace MaxLight
             SaveConfig(config);
         }
 
-
         public static ProxySettings GetProxySettings()
         {
             var config = LoadConfig();
             var proxy = config?.Proxy;
 
-            // Валидация при загрузке
             if (proxy != null && proxy.Enabled)
             {
                 if (string.IsNullOrEmpty(proxy.Server) || proxy.Port <= 0)
                 {
                     proxy.Enabled = false;
-                    System.Diagnostics.Debug.WriteLine("⚠️ Прокси отключен при загрузке: некорректные параметры");
+                    System.Diagnostics.Debug.WriteLine("⚠️ Прокси отключен: некорректные параметры");
                     SaveConfig(config);
                 }
             }
@@ -327,7 +338,6 @@ namespace MaxLight
                             notificationsOnTop = (int)notifValue;
                         }
 
-                        // Читаем состояние окна
                         int w = (int)key.GetValue("Width", -1);
                         int h = (int)key.GetValue("Height", -1);
                         int x = (int)key.GetValue("Left", -1);
@@ -350,13 +360,11 @@ namespace MaxLight
 
                 if (!hasRegistryData && string.IsNullOrEmpty(pin) && windowState == null && notificationsOnTop == null)
                 {
-                    return false; // Нет данных для миграции
+                    return false;
                 }
 
-                // Переносим данные в config.json
                 var config = LoadConfig();
 
-                // Переносим авторизацию
                 if (hasRegistryData && !string.IsNullOrEmpty(authData))
                 {
                     try
@@ -385,7 +393,6 @@ namespace MaxLight
                     }
                 }
 
-                // Переносим PIN
                 if (!string.IsNullOrEmpty(pin))
                 {
                     try
@@ -399,22 +406,18 @@ namespace MaxLight
                     }
                 }
 
-                // Переносим состояние окна
                 if (windowState != null)
                 {
                     config.WindowState = windowState;
                 }
 
-                // Переносим настройку уведомлений
                 if (notificationsOnTop.HasValue)
                 {
                     config.NotificationsOnTop = notificationsOnTop.Value == 1;
                 }
 
-                // Сохраняем config.json
                 SaveConfig(config);
 
-                // Удаляем ветку реестра
                 try
                 {
                     Registry.CurrentUser.DeleteSubKeyTree("SOFTWARE\\MaxLight");
