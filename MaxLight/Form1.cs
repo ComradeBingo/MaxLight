@@ -177,9 +177,19 @@ namespace MaxLight
             if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
                 return true;
 
-            // Проверяем наличие файла .portable
+            // Проверяем наличие файла .portable в текущей папке
             string portableFile = Path.Combine(Application.StartupPath, ".portable");
             if (File.Exists(portableFile))
+                return true;
+
+            // Проверяем наличие файла .portable в папке выше (для Velopack portable структуры)
+            string parentPortableFile = Path.Combine(Path.GetDirectoryName(Application.StartupPath) ?? "", ".portable");
+            if (File.Exists(parentPortableFile))
+                return true;
+
+            // Проверяем наличие файла .portable в папке current (для Velopack portable структуры)
+            string currentPortableFile = Path.Combine(Application.StartupPath, "current", ".portable");
+            if (File.Exists(currentPortableFile))
                 return true;
 
             return false;
@@ -616,19 +626,7 @@ namespace MaxLight
                 _normalIcon?.Dispose();
                 _unreadIcon?.Dispose();
 
-                // ВСЕГДА удаляем папку WebView2
-                if (!string.IsNullOrEmpty(tempUserDataFolder) && Directory.Exists(tempUserDataFolder))
-                {
-                    try
-                    {
-                        System.Diagnostics.Debug.WriteLine($"🗑️ Удаляем папку WebView2: {tempUserDataFolder}");
-                        await Task.Run(() => Directory.Delete(tempUserDataFolder, true));
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"⚠️ Ошибка удаления папки WebView2: {ex.Message}");
-                    }
-                }
+               
 
                 if (webView != null && webView.CoreWebView2 != null)
                 {
