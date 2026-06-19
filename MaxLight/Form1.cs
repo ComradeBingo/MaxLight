@@ -10,6 +10,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
@@ -29,18 +30,26 @@ namespace MaxLight
         private string tempUserDataFolder;
         private AuthData _currentAuthData;
 
+        // Флаг для управления парсером токенов
         private bool _tokenParserActive = false;
         private bool _authRestored = false;
 
+        // Поля для подсветки иконки в панели задач
         private Timer notificationFlashTimer;
         private bool isAttentionRequired = false;
         private const int ATTENTION_TIMEOUT_MS = 5000;
 
+        // ========== ПОЛЯ ДЛЯ ТРЕЯ ==========
         private int _unreadCount = 0;
         private Icon _normalIcon;
         private Icon _unreadIcon;
 
+        // ========== PORTABLE РЕЖИМ ==========
         private bool _isPortable;
+
+        // ========== EVENT WAIT HANDLE ДЛЯ АКТИВАЦИИ ==========
+        private EventWaitHandle _activateEvent;
+        private CancellationTokenSource _cts;
 
         private readonly string[] _trackingKeywords = new[]
         {
@@ -48,21 +57,34 @@ namespace MaxLight
             "adsystem", "crashtoken", "crash", "track"
         };
 
-        public Form1()
+        // Конструктор без параметров (для совместимости)
+        public Form1() : this(null)
         {
-            _isPortable = IsPortableMode();
+        }
 
+        // Основной конструктор с EventWaitHandle
+        public Form1(EventWaitHandle activateEvent)
+        {
+            _activateEvent = activateEvent;
+
+            // ========== ОПРЕДЕЛЯЕМ PORTABLE РЕЖИМ ==========
+            _isPortable = IsPortableMode();
+            System.Diagnostics.Debug.WriteLine($"📁 Portable режим: {_isPortable}");
+
+            // ========== ПРОВЕРКА PIN ==========
             if (!CheckPinOnStartup())
             {
                 Environment.Exit(0);
             }
 
+            // ========== ОСТАЛЬНАЯ ИНИЦИАЛИЗАЦИЯ ==========
             InitializeForm();
             LoadWindowState();
             CreateTrayIcon();
             LoadIcons();
             CreateTitleBar();
 
+            // Загружаем настройку для уведомлений
             LoadNotificationsOnTopSetting();
 
             CreateErrorPanel();
@@ -102,44 +124,17 @@ namespace MaxLight
                 }
                 catch { }
             };
-        }
 
-        private bool IsPortableMode()
-        {
-            var args = Environment.GetCommandLineArgs();
-            if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
-                return true;
-
-            string exeName = Path.GetFileName(Application.ExecutablePath);
-            if (exeName.Contains(".portable.exe"))
-                return true;
-
-            string portableFile = Path.Combine(Application.StartupPath, ".portable");
-            if (File.Exists(portableFile))
-                return true;
-
-            string parentFolder = Path.GetFullPath(Path.Combine(Application.StartupPath, ".."));
-            string parentPortableFile = Path.Combine(parentFolder, ".portable");
-            if (File.Exists(parentPortableFile))
-                return true;
-
-            return false;
+            // Запускаем поток для ожидания сигнала активации
+            if (_activateEvent != null)
+            {
+                _cts = new CancellationTokenSource();
+                Task.Run(() => WaitForActivationSignal(_cts.Token));
+            }
         }
 
         private void InitializeForm()
         {
-            try
-            {
-                if (ConfigManager.MigrateFromRegistry())
-                {
-                    System.Diagnostics.Debug.WriteLine("✅ Миграция из реестра в config.json выполнена");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Ошибка миграции: {ex.Message}");
-            }
-
             this.SetStyle(ControlStyles.AllPaintingInWmPaint |
                   ControlStyles.UserPaint |
                   ControlStyles.DoubleBuffer |
@@ -158,6 +153,84 @@ namespace MaxLight
             {
                 try { this.Icon = new Icon(iconPath); } catch { }
             }
+        }
+
+        private void WaitForActivationSignal(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (_activateEvent.WaitOne(1000))
+                    {
+                        // Получили сигнал - активируем окно
+                        this.BeginInvoke(new Action(() => ActivateWindow()));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка в WaitForActivationSignal: {ex.Message}");
+                }
+            }
+        }
+
+        private void ActivateWindow()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("🔄 Активация окна...");
+
+                // Если окно скрыто (в трее) - показываем
+                if (!this.Visible)
+                {
+                    this.Show();
+                    this.ShowInTaskbar = true;
+                }
+
+                // Если окно свернуто - разворачиваем
+                if (this.WindowState == FormWindowState.Minimized)
+                {
+                    this.WindowState = FormWindowState.Normal;
+                }
+
+                // Поднимаем на передний план
+                this.Activate();
+                this.BringToFront();
+
+                // Фокусируем WebView
+                webView?.Focus();
+
+                System.Diagnostics.Debug.WriteLine("✅ Окно активировано");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Ошибка активации окна: {ex.Message}");
+            }
+        }
+
+        private bool IsPortableMode()
+        {
+            // Проверяем аргументы командной строки
+            var args = Environment.GetCommandLineArgs();
+            if (args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase)))
+                return true;
+
+            // Проверяем наличие файла .portable в папке с программой
+            string portableFile = Path.Combine(Application.StartupPath, ".portable");
+            if (File.Exists(portableFile))
+                return true;
+
+            // Проверяем на уровень выше (для обновленных portable версий)
+            string parentFolder = Path.GetFullPath(Path.Combine(Application.StartupPath, ".."));
+            string parentPortableFile = Path.Combine(parentFolder, ".portable");
+            if (File.Exists(parentPortableFile))
+                return true;
+
+            return false;
         }
 
         private void Form1_Resize(object sender, EventArgs e)
@@ -578,6 +651,11 @@ namespace MaxLight
             }
             else
             {
+                // Отменяем Task
+                _cts?.Cancel();
+                _cts?.Dispose();
+                _activateEvent?.Dispose();
+
                 SaveWindowState();
 
                 if (trayIcon != null)
@@ -664,16 +742,25 @@ namespace MaxLight
             _ = InitializeWebViewAsync(userDataFolder);
         }
 
-       
         private string GetWebViewUserDataFolder()
         {
-            string dataFolder = Path.Combine(Application.StartupPath, "WebView2Data");
+            // Получаем корневую папку (на уровень выше, если программа в current)
+            string rootFolder = Application.StartupPath;
+
+            // Если программа запущена из папки current, поднимаемся на уровень выше
+            if (Path.GetFileName(rootFolder).Equals("current", StringComparison.OrdinalIgnoreCase))
+            {
+                rootFolder = Path.GetFullPath(Path.Combine(rootFolder, ".."));
+            }
+
+            string dataFolder = Path.Combine(rootFolder, "WebView2Data");
 
             if (!Directory.Exists(dataFolder))
             {
                 Directory.CreateDirectory(dataFolder);
             }
 
+            System.Diagnostics.Debug.WriteLine($"📁 Папка WebView2: {dataFolder}");
             return dataFolder;
         }
 

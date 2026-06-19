@@ -14,7 +14,7 @@ namespace MaxLight
 {
     internal static class Program
     {
-        private static Mutex _appMutex;
+        private static EventWaitHandle _activateEvent;
 
         [STAThread]
         static void Main()
@@ -25,13 +25,15 @@ namespace MaxLight
 
                 if (!isPortable)
                 {
-                    string mutexName = "MaxLight_AppMutex";
                     bool createdNew;
-                    _appMutex = new Mutex(true, mutexName, out createdNew);
+                    _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "MaxLight_ActivateEvent", out createdNew);
 
                     if (!createdNew)
                     {
-                        ActivateExistingInstance();
+                        // Сигнализируем существующему экземпляру
+                        _activateEvent.Set();
+                        Debug.WriteLine("📢 Сигнал активации отправлен существующему экземпляру");
+                        Thread.Sleep(500);
                         return;
                     }
                 }
@@ -43,11 +45,8 @@ namespace MaxLight
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
-                var form1 = new Form1();
+                var form1 = new Form1(_activateEvent);
                 Application.Run(form1);
-
-                _appMutex?.ReleaseMutex();
-                _appMutex?.Dispose();
             }
             catch (Exception ex)
             {
@@ -55,32 +54,6 @@ namespace MaxLight
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        private static void ActivateExistingInstance()
-        {
-            try
-            {
-                var hWnd = FindWindow(null, "Max Light");
-                if (hWnd != IntPtr.Zero)
-                {
-                    ShowWindow(hWnd, 9);
-                    SetForegroundWindow(hWnd);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка активации: {ex.Message}");
-            }
-        }
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern IntPtr FindWindow(string className, string windowName);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         private static bool IsPortableMode()
         {

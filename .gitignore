@@ -5,6 +5,7 @@ bin/
 obj/
 publish/
 releases/
+packages/
 FodyWeavers.xsd
 FodyWeavers.xml.*
 weaver/
