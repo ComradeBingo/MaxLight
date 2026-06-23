@@ -40,8 +40,8 @@ namespace MaxLight
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(52, 73, 94),
-                Height = 70,
+                BackColor = Color.FromArgb(66, 75, 121),
+                Height = 48,
                 Dock = DockStyle.Top
             };
 
@@ -49,9 +49,9 @@ namespace MaxLight
             lblTitle = new Label
             {
                 Text = "Max Light",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(20, 22),
+                Location = new Point(12, 12),
                 AutoSize = true
             };
 
@@ -62,7 +62,7 @@ namespace MaxLight
                 Text = $"Версия {version}",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(189, 195, 199),
-                Location = new Point(150, 32),
+                Location = new Point(130, 16),
                 AutoSize = true
             };
 
@@ -177,12 +177,14 @@ namespace MaxLight
             // ===== КНОПКА ЗАКРЫТИЯ =====
             btnOk = new Button
             {
+                Text = "ЗАКРЫТЬ",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
-                Text = "Закрыть",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Size = new Size(120, 38),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 415),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };

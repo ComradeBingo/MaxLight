@@ -143,7 +143,7 @@ namespace MaxLight
 
             var screen = Screen.PrimaryScreen.Bounds;
             this.Size = new Size(1050, 800);
-            this.BackColor = Color.FromArgb(236, 240, 241);
+            this.BackColor = Color.FromArgb(66, 75, 121);
             this.MinimumSize = new Size(640, 480);
             this.MaximumSize = new Size(screen.Width, screen.Height);
             this.ShowInTaskbar = true;
@@ -257,7 +257,7 @@ namespace MaxLight
         {
             if (webView != null && titleBar != null)
             {
-                int borderSize = 5;
+                int borderSize = 2; // ширина рамки программной обертки WebView2
                 int titleBarHeight = titleBar.Height;
 
                 webView.Location = new Point(borderSize, titleBarHeight);

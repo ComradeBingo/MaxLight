@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using System.Linq;
@@ -35,24 +34,19 @@ namespace MaxLight
         public event Action AboutClicked;
         public event Action ProxySettingsChanged;
 
-        // Флаг portable режима
         private bool _isPortable;
-
-        // Сохраняем исходные настройки прокси при открытии
         private ConfigManager.ProxySettings _originalProxySettings;
 
-        // Конструктор с параметром isPortable (по умолчанию false)
         public SettingsForm(bool isPortable = false)
         {
             _isPortable = isPortable;
 
             InitializeForm();
-            SetupModernStyle();
+
             LoadAutoStartState();
             LoadNotificationsOnTopState();
             LoadProxySettings();
 
-            // Если portable - отключаем автозапуск
             if (_isPortable)
             {
                 chkAutoStart.Enabled = false;
@@ -73,53 +67,46 @@ namespace MaxLight
             this.MaximumSize = new Size(750, 480);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
-
+            
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(52, 73, 94),
-                Height = 70,
+                BackColor = Color.FromArgb(66, 75, 121),
+                Height = 48,
                 Dock = DockStyle.Top
             };
 
-            // Заголовок
             lblTitle = new Label
             {
                 Text = "Настройки",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(20, 22),
+                Location = new Point(12, 12),
                 AutoSize = true
             };
 
-            // ===== ЛЕВАЯ КОЛОНКА =====
             int leftColumnX = 30;
             int rightColumnX = 390;
             int rowY = 100;
-            int rowSpacing = 45;
+            int rowSpacing = 35;
 
-            // ===== СЕКЦИЯ 1: АВТОЗАПУСК (ЛЕВАЯ КОЛОНКА) =====
+            // ===== Общие настройки =====
+            rowY += 5;
+            CreateSectionHeader("\uE713", "ОБЩИЕ", new Point(leftColumnX + 60, rowY));
+
+            // ===== АВТОЗАПУСК =====
             chkAutoStart = new CheckBox
             {
                 Text = "Автоматически запускать\nпри входе в Windows",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX, rowY),
+                Location = new Point(leftColumnX + 30, rowY += rowSpacing),
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
 
-            // ===== СЕКЦИЯ 2: УВЕДОМЛЕНИЯ (ЛЕВАЯ КОЛОНКА) =====
-            rowY += rowSpacing;
-            Label lblNotificationsSection = new Label
-            {
-                Text = "🔔 Уведомления",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX, rowY),
-                AutoSize = true
-            };
+            
 
             rowY += 28;
             chkNotificationsOnTop = new CheckBox
@@ -127,66 +114,40 @@ namespace MaxLight
                 Text = "Показывать уведомления\nповерх всех окон",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX + 20, rowY),
+                Location = new Point(leftColumnX + 30, rowY += rowSpacing),
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
             chkNotificationsOnTop.CheckedChanged += (s, e) => NotificationsOnTopToggled?.Invoke(chkNotificationsOnTop.Checked);
 
-            // ===== СЕКЦИЯ 3: БЕЗОПАСНОСТЬ И АККАУНТ (ЛЕВАЯ КОЛОНКА) =====
-            rowY += rowSpacing + 10;
-            Label lblSecuritySection = new Label
-            {
-                Text = "🔒 Безопасность и аккаунт",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX, rowY),
-                AutoSize = true
-            };
+            // ===== БЕЗОПАСНОСТЬ =====
+            rowY += rowSpacing + 35;
+           
+            CreateSectionHeader("\uE72E", "Безопасность и аккаунт", new Point(leftColumnX+28, rowY));
 
             rowY += 28;
-            btnPinSettings = new Button
-            {
-                Text = "🔑 Управление PIN-кодом",
-                Font = new Font("Segoe UI", 10),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(52, 73, 94),
-                ForeColor = Color.White,
-                Size = new Size(220, 35),
-                Location = new Point(leftColumnX + 20, rowY),
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            btnPinSettings.FlatAppearance.BorderSize = 0;
+            btnPinSettings = CreateStyledButton(
+                "\uE72E",
+                "Управление PIN-кодом",
+                Color.FromArgb(66, 75, 121),
+                new Size(220, 35),
+                new Point(leftColumnX + 20, rowY)
+            );
             btnPinSettings.Click += (s, e) => PinSettingsClicked?.Invoke();
 
             rowY += 45;
-            btnLogout = new Button
-            {
-                Text = "🚪 Выйти из аккаунта",
-                Font = new Font("Segoe UI", 10),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(231, 76, 60),
-                ForeColor = Color.White,
-                Size = new Size(220, 35),
-                Location = new Point(leftColumnX + 20, rowY),
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout = CreateStyledButton(
+                "\uE711",
+                "Выйти из аккаунта",
+                Color.FromArgb(231, 76, 60),
+                new Size(220, 35),
+                new Point(leftColumnX + 20, rowY)
+            );
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
 
-            // ===== СЕКЦИЯ 4: ПРОКСИ (ПРАВАЯ КОЛОНКА) =====
+            // ===== ПРОКСИ =====
             int rightRowY = 100;
-
-            Label lblProxySection = new Label
-            {
-                Text = "🌐 Настройки прокси",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(rightColumnX, rightRowY),
-                AutoSize = true
-            };
+            CreateSectionHeader("\uE774", "Настройки прокси", new Point(rightColumnX + 48, rightRowY));
 
             rightRowY += 30;
             grpProxy = new GroupBox
@@ -258,17 +219,36 @@ namespace MaxLight
                 Text = "Применить",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
                 BackColor = Color.FromArgb(46, 204, 113),
                 ForeColor = Color.White,
                 Size = new Size(90, 27),
-                Location = new Point(190, 75),
+                Location = new Point(185, 75),
                 Cursor = Cursors.Hand,
-                Enabled = false
+                Enabled = false,
+                TextAlign = ContentAlignment.MiddleCenter
             };
-            btnApplyProxy.FlatAppearance.BorderSize = 0;
-            btnApplyProxy.Click += (s, e) =>
+            btnApplyProxy.Click += (s, e) => ApplyProxySettings();
+
+            // Эффекты при наведении
+            btnApplyProxy.MouseEnter += (s, e) =>
             {
-                ApplyProxySettings();
+                btnApplyProxy.BackColor = ControlPaint.Light(Color.FromArgb(46, 204, 113), 0.3f);
+            };
+            btnApplyProxy.MouseLeave += (s, e) =>
+            {
+                btnApplyProxy.BackColor = Color.FromArgb(46, 204, 113);
+            };
+
+            btnApplyProxy.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btnApplyProxy.BackColor = ControlPaint.Dark(Color.FromArgb(46, 204, 113), 0.2f);
+            };
+            btnApplyProxy.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btnApplyProxy.BackColor = Color.FromArgb(46, 204, 113);
             };
 
             grpProxy.Controls.Add(chkProxyEnabled);
@@ -278,67 +258,161 @@ namespace MaxLight
             grpProxy.Controls.Add(numProxyPort);
             grpProxy.Controls.Add(btnApplyProxy);
 
-            // ===== КНОПКА "О ПРОГРАММЕ" (ПРАВАЯ КОЛОНКА) =====
+            // ===== О ПРОГРАММЕ =====
             rightRowY += 170;
-            btnAbout = new Button
-            {
-                Text = "ℹ️ О программе",
-                Font = new Font("Segoe UI", 10),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(149, 165, 166),
-                ForeColor = Color.White,
-                Size = new Size(220, 35),
-                Location = new Point(rightColumnX + 50, rightRowY),
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            btnAbout.FlatAppearance.BorderSize = 0;
+            btnAbout = CreateStyledButton(
+                "\uE946",
+                "О программе",
+                Color.FromArgb(66, 75, 121),
+                new Size(220, 35),
+                new Point(rightColumnX + 50, rightRowY)
+            );
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
 
-            // Кнопка закрытия (внизу по центру)
+            
+            // ===== КНОПКА ЗАКРЫТИЯ =====
             btnClose = new Button
             {
-                Text = "Закрыть",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Text = "ЗАКРЫТЬ",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Size = new Size(120, 38),
                 Location = new Point((this.ClientSize.Width - 120) / 2, 415),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleCenter
             };
-            btnClose.FlatAppearance.BorderSize = 0;
             btnClose.Click += (s, e) => this.Close();
 
-            // Добавляем элементы
+            // Добавляем эффекты при наведении
+            btnClose.MouseEnter += (s, e) =>
+            {
+                btnClose.BackColor = ControlPaint.Light(Color.FromArgb(52, 152, 219), 0.3f);
+            };
+            btnClose.MouseLeave += (s, e) =>
+            {
+                btnClose.BackColor = Color.FromArgb(52, 152, 219);
+            };
+
+            btnClose.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btnClose.BackColor = ControlPaint.Dark(Color.FromArgb(52, 152, 219), 0.2f);
+            };
+            btnClose.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btnClose.BackColor = Color.FromArgb(52, 152, 219);
+            };
+
             headerPanel.Controls.Add(lblTitle);
             this.Controls.Add(headerPanel);
             this.Controls.Add(chkAutoStart);
-            this.Controls.Add(lblNotificationsSection);
             this.Controls.Add(chkNotificationsOnTop);
-            this.Controls.Add(lblSecuritySection);
             this.Controls.Add(btnPinSettings);
             this.Controls.Add(btnLogout);
-            this.Controls.Add(lblProxySection);
             this.Controls.Add(grpProxy);
             this.Controls.Add(btnAbout);
             this.Controls.Add(btnClose);
         }
 
-        private void SetupModernStyle()
+        // ===== МЕТОД ДЛЯ ЗАГОЛОВКОВ СЕКЦИЙ =====
+        private void CreateSectionHeader(string iconChar, string text, Point location)
         {
-            this.Paint += (s, e) =>
+            Label iconLabel = new Label
             {
-                GraphicsPath path = new GraphicsPath();
-                int radius = 15;
-                Rectangle rect = new Rectangle(0, 0, this.Width, this.Height);
-
-                path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y, radius, radius, 270, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y + rect.Height - radius, radius, radius, 0, 90);
-                path.AddArc(rect.X, rect.Y + rect.Height - radius, radius, radius, 90, 90);
-                this.Region = new Region(path);
+                Text = iconChar,
+                Font = new Font("Segoe MDL2 Assets", 14, FontStyle.Regular),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                AutoSize = true,
+                Location = new Point(location.X, location.Y),
+                TextAlign = ContentAlignment.MiddleLeft
             };
+
+            Label textLabel = new Label
+            {
+                Text = text,
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                AutoSize = true,
+                Location = new Point(location.X + 28, location.Y),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            this.Controls.Add(iconLabel);
+            this.Controls.Add(textLabel);
+        }
+
+        // ===== МЕТОД ДЛЯ КНОПОК =====
+        private Button CreateStyledButton(string iconChar, string text, Color backColor, Size size, Point location, float fontSize = 10)
+        {
+            var btn = new Button
+            {
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
+                BackColor = backColor,
+                ForeColor = Color.White,
+                Size = size,
+                Location = location,
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", fontSize, FontStyle.Bold),
+                Text = ""
+            };
+
+            var iconLabel = new Label
+            {
+                Text = iconChar,
+                Font = new Font("Segoe MDL2 Assets", 14, FontStyle.Regular),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(12, (size.Height - 20) / 2),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Cursor = Cursors.Hand
+            };
+
+            var textLabel = new Label
+            {
+                Text = text,
+                Font = new Font("Segoe UI", fontSize, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(40, (size.Height - 20) / 2),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand
+            };
+
+            btn.Controls.Add(iconLabel);
+            btn.Controls.Add(textLabel);
+
+            iconLabel.Click += (s, e) => btn.PerformClick();
+            textLabel.Click += (s, e) => btn.PerformClick();
+
+            btn.MouseEnter += (s, e) =>
+            {
+                btn.BackColor = ControlPaint.Light(backColor, 0.3f);
+            };
+            btn.MouseLeave += (s, e) =>
+            {
+                btn.BackColor = backColor;
+            };
+
+            btn.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btn.BackColor = ControlPaint.Dark(backColor, 0.2f);
+            };
+            btn.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                    btn.BackColor = backColor;
+            };
+
+            return btn;
         }
 
         private bool IsAutoStartEnabled()
@@ -398,7 +472,6 @@ namespace MaxLight
                     numProxyPort.Value = 8080;
                 }
 
-                // Обновляем состояние полей
                 txtProxyServer.Enabled = chkProxyEnabled.Checked;
                 numProxyPort.Enabled = chkProxyEnabled.Checked;
                 btnApplyProxy.Enabled = false;
@@ -435,7 +508,6 @@ namespace MaxLight
         {
             try
             {
-                // Проверяем, изменились ли настройки
                 if (!HasProxySettingsChanged())
                 {
                     System.Diagnostics.Debug.WriteLine("ℹ️ Настройки прокси не изменились");
@@ -447,7 +519,6 @@ namespace MaxLight
                 string server = txtProxyServer.Text.Trim();
                 int port = (int)numProxyPort.Value;
 
-                // ВАЛИДАЦИЯ: если прокси включен, но сервер пустой или порт 0 - отключаем
                 if (enabled && (string.IsNullOrEmpty(server) || port <= 0))
                 {
                     var result = MessageBox.Show(
@@ -466,16 +537,14 @@ namespace MaxLight
                     }
                     else
                     {
-                        return; // Не сохраняем, остаемся в настройках
+                        return;
                     }
                 }
 
-                // Сохраняем настройки
                 ConfigManager.SaveProxySettings(enabled, server, port);
 
                 System.Diagnostics.Debug.WriteLine($"🌐 Настройки прокси сохранены: {enabled}");
 
-                // Если настройки изменились и прокси включен - перезапускаем
                 ProxySettingsChanged?.Invoke();
                 this.Close();
             }
