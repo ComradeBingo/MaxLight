@@ -13,6 +13,7 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -25,7 +26,6 @@
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
@@ -93,6 +93,27 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Form1.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.Messaging.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.Notifications.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.Security.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.Tray.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.UI.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.WebView2.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form1.WindowState.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="PinInputForm.cs">

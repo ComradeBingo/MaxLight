@@ -67,11 +67,11 @@ namespace MaxLight
             this.MaximumSize = new Size(750, 480);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
-            
+
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(66, 75, 121),
+                BackColor = Color.FromArgb(66, 75, 121), // цвет верхней панели
                 Height = 48,
                 Dock = DockStyle.Top
             };
@@ -106,7 +106,7 @@ namespace MaxLight
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
 
-            
+
 
             rowY += 28;
             chkNotificationsOnTop = new CheckBox
@@ -122,14 +122,14 @@ namespace MaxLight
 
             // ===== БЕЗОПАСНОСТЬ =====
             rowY += rowSpacing + 35;
-           
-            CreateSectionHeader("\uE72E", "Безопасность и аккаунт", new Point(leftColumnX+28, rowY));
+
+            CreateSectionHeader("\uE72E", "Безопасность и аккаунт", new Point(leftColumnX + 28, rowY));
 
             rowY += 28;
             btnPinSettings = CreateStyledButton(
                 "\uE72E",
                 "Управление PIN-кодом",
-                Color.FromArgb(66, 75, 121),
+                Color.FromArgb(66, 75, 121), //цвет панели
                 new Size(220, 35),
                 new Point(leftColumnX + 20, rowY)
             );
@@ -262,14 +262,14 @@ namespace MaxLight
             rightRowY += 170;
             btnAbout = CreateStyledButton(
                 "\uE946",
-                "О программе",
-                Color.FromArgb(66, 75, 121),
+                "О ПРОГРАММЕ",
+                Color.FromArgb(66, 75, 121), //цвет кнопки
                 new Size(220, 35),
                 new Point(rightColumnX + 50, rightRowY)
             );
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
 
-            
+
             // ===== КНОПКА ЗАКРЫТИЯ =====
             btnClose = new Button
             {

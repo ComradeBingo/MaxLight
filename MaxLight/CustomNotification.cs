@@ -46,7 +46,7 @@ namespace MaxLight
             this.Text = title;
 
             // Устанавливаем размер формы
-            int formWidth = 460;
+            int formWidth = 360;
             this.ClientSize = new Size(formWidth, 200);
 
             // Создаем главную панель
@@ -351,8 +351,8 @@ namespace MaxLight
             this.FormBorderStyle = FormBorderStyle.None;
             this.ShowInTaskbar = false;
             this.StartPosition = FormStartPosition.Manual;
-            this.BackColor = Color.FromArgb(45, 45, 48);
-            this.Opacity = 0.95;
+            this.BackColor = Color.FromArgb(66, 75, 121);  //45, 45, 48 темно-серый фон был раньше. Посмотрим, как примут юзеры
+            this.Opacity = 1; //0.95
 
             // Используем глобальную настройку для TopMost
             this.TopMost = _alwaysOnTop;

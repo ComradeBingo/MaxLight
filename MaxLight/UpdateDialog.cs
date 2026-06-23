@@ -35,7 +35,7 @@ namespace MaxLight
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(52, 73, 94),
+                BackColor = Color.FromArgb(66, 75, 121), //цвет верхней панели
                 Height = 80,
                 Dock = DockStyle.Top
             };

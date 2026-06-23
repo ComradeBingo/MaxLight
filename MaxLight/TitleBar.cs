@@ -29,7 +29,7 @@ namespace MaxLight
         public event EventHandler SettingsClick;
 
         // Цветовая схема 
-        private static readonly Color BackgroundColor = Color.FromArgb(66, 75, 121);
+        private static readonly Color BackgroundColor = Color.FromArgb(66, 75, 121); // Основной цвет BG тайтл-бара
         private static readonly Color HoverColor = Color.FromArgb(60, 60, 60);
         private static readonly Color TextColor = Color.FromArgb(200, 200, 200);
         private static readonly Color CloseHoverColor = Color.FromArgb(232, 17, 35);
@@ -163,7 +163,7 @@ namespace MaxLight
             if (btnClose == null) return;
 
             int buttonTop = (this.Height - btnClose.Height) / 2;
-            int rightMargin = 0;
+            int rightMargin = 10; //отступ справа для кнопок "свернуть, закрыть и т.д."
 
             btnClose.Location = new Point(this.Width - btnClose.Width - rightMargin, buttonTop);
             btnMaximize.Location = new Point(btnClose.Left - btnMaximize.Width, buttonTop);

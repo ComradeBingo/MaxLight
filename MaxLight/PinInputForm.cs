@@ -43,7 +43,7 @@ namespace MaxLight
             this.SuspendLayout();
 
             // headerPanel
-            this.headerPanel.BackColor = Color.FromArgb(52, 73, 94);
+            this.headerPanel.BackColor = Color.FromArgb(66, 75, 121);
             this.headerPanel.Controls.Add(this.lblTitle);
             this.headerPanel.Dock = DockStyle.Top;
             this.headerPanel.Height = 60;
