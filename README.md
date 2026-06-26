@@ -1,5 +1,4 @@
-<div align="center"><img src="https://github.com/user-attachments/assets/5c74e75d-ad5c-4da1-b908-054aae61f500" /></div>
-
+<div align="center"><img src="https://github.com/user-attachments/assets/04a8fa30-071e-448f-ba06-7b6d5cdf81f3" /></div>
 
 
 **Max Light** — это обёртка для веб-мессенджера Max (web.max.ru), сочетающая в себе возможности десктопной версии с рядом преимуществ.
@@ -86,15 +85,7 @@
 
 **P.S.:** К сожалению, данная программа по сути является лишь многофункциональной надстройкой и не решает большинство проблем MAX, поэтому сквозное шифрование пока что остается на совести официальных разработчиков.
 
-## ⚙️ Конфигурация и хранение данных
-
-| Данные | Место хранения | Шифрование |
-|--------|----------------|-------------|
-| Токен авторизации | `HKCU\SOFTWARE\MaxLight\Auth` | ✅ DPAPI |
-| DeviceId | Внутри зашифрованного AuthData | ✅ DPAPI |
-| PIN-код | `HKCU\SOFTWARE\MaxLight\PIN` | ✅ DPAPI |
-| Размер/позиция окна | `HKCU\SOFTWARE\MaxLight\WindowState` | ❌ Нет |
-| Автозапуск | `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` | ❌ Нет |
+<img width="128" height="128" alt="ComfyUI_00127_128x128" src="https://github.com/user-attachments/assets/813ea828-f27f-4fb6-8818-6bd381f4fc92" />
 
 
 
