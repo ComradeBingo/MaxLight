@@ -100,14 +100,26 @@
         try {
             var messageSpan = chatElement.querySelector('.text.svelte-q2jdqb');
             if (messageSpan) {
+                // Получаем текст
                 var text = messageSpan.innerText.trim();
                 text = text.replace(/<!---->/g, '').trim();
+
+                // Нормализуем переносы строк: заменяем все \n и \r на пробелы,
+                // но сохраняем структуру "Имя: текст"
+                text = text.replace(/\n\s*:\s*/g, ': ');  // \n: -> : 
+                text = text.replace(/\n/g, ' ');          // остальные \n -> пробел
+                text = text.replace(/\s+/g, ' ');         // множественные пробелы -> один
+
                 if (text) return text;
             }
 
+            // Альтернативный поиск
             var anyMessageSpan = chatElement.querySelector('span[class*="text"]:not([class*="riu5uh"])');
             if (anyMessageSpan) {
                 var altText = anyMessageSpan.innerText.trim();
+                altText = altText.replace(/\n\s*:\s*/g, ': ');
+                altText = altText.replace(/\n/g, ' ');
+                altText = altText.replace(/\s+/g, ' ');
                 if (altText) return altText;
             }
 

@@ -1,18 +1,22 @@
-﻿using System;
+﻿using Microsoft.Web.WebView2.WinForms;
+using Newtonsoft.Json;
+using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Microsoft.Web.WebView2.WinForms;
-using Newtonsoft.Json;
 using Timer = System.Windows.Forms.Timer;
 
 namespace MaxLight
 {
     public partial class Form1 : Form
     {
+
+        
+
         // ========== ПОЛЯ ==========
         private WebView2 webView;
         private TitleBar titleBar;
@@ -103,6 +107,42 @@ namespace MaxLight
             }
         }
 
+
+        // ========== НОВО: Событие клика по уведомлению ==========
+        public event EventHandler UpdateNotificationClicked;
+
+        // ========== НОВО: Показать уведомление в TitleBar ==========
+        public void ShowUpdateNotification(string version)
+        {
+            if (titleBar != null)
+            {
+                // Подписываемся на клик по уведомлению
+                titleBar.UpdateNotificationClick -= OnTitleBarUpdateClick; // Отписываемся, чтобы избежать дублей
+                titleBar.UpdateNotificationClick += OnTitleBarUpdateClick;
+
+                // Показываем уведомление
+                titleBar.ShowUpdateNotification(version);
+            }
+        }
+
+        // ========== НОВО: Скрыть уведомление ==========
+        public void HideUpdateNotification()
+        {
+            titleBar?.HideUpdateNotification();
+        }
+
+        // ========== НОВО: Обработчик клика по уведомлению в TitleBar ==========
+        private void OnTitleBarUpdateClick(object sender, EventArgs e)
+        {
+            UpdateNotificationClicked?.Invoke(this, EventArgs.Empty);
+        }
+
+        // ========== НОВО: Проверка, есть ли обновление ==========
+        public bool HasUpdate => titleBar?.HasUpdate ?? false;
+        public string UpdateVersion => titleBar?.UpdateVersion ?? "";
+
+
+
         // ========== ОСНОВНЫЕ МЕТОДЫ ==========
 
         private void InitializeForm()
@@ -144,7 +184,6 @@ namespace MaxLight
             settingsForm.PinSettingsClicked += ShowPinSettings;
             settingsForm.LogoutClicked += async () => await Logout();
             settingsForm.AboutClicked += ShowAbout;
-
             settingsForm.ProxySettingsChanged += () =>
             {
                 MessageBox.Show(
@@ -156,7 +195,28 @@ namespace MaxLight
                 Environment.Exit(0);
             };
 
+            //  подписываемся на событие проверки обновлений ★
+            settingsForm.CheckUpdatesClicked += OnCheckUpdatesClickedAsync;
+
             settingsForm.ShowDialog(this);
+        }
+
+        // НОВЫЙ МЕТОД: возвращает bool (найдено обновление или нет) 
+        private async Task<bool> OnCheckUpdatesClickedAsync()
+        {
+            try
+            {
+                // Запускаем проверку
+                await Program.ForceCheckUpdatesAsync();
+
+                // Возвращаем результат
+                return titleBar.HasUpdate;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Ошибка проверки обновлений: {ex.Message}");
+                throw; // Пробрасываем для отображения в SettingsForm
+            }
         }
 
         private void ShowAbout()

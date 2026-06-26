@@ -17,7 +17,7 @@ namespace MaxLight
         public UpdateDialog(string version, string releaseNotes, string portableHint = "")
         {
             InitializeForm(version, releaseNotes, portableHint);
-            SetupModernStyle();
+            
         }
 
         private void InitializeForm(string version, string releaseNotes, string portableHint)
@@ -36,7 +36,7 @@ namespace MaxLight
             headerPanel = new Panel
             {
                 BackColor = Color.FromArgb(66, 75, 121), //цвет верхней панели
-                Height = 80,
+                Height = 48,
                 Dock = DockStyle.Top
             };
 
@@ -46,7 +46,7 @@ namespace MaxLight
                 Text = "Доступно обновление",
                 Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(20, 20),
+                Location = new Point(10, 10),
                 AutoSize = true
             };
 
@@ -56,7 +56,7 @@ namespace MaxLight
                 Text = $"Версия {version}{portableHint}",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(189, 195, 199),
-                Location = new Point(22, 52),
+                Location = new Point(150, 22),
                 AutoSize = true
             };
 
@@ -138,20 +138,6 @@ namespace MaxLight
             this.Controls.Add(btnSkip);
         }
 
-        private void SetupModernStyle()
-        {
-            this.Paint += (s, e) =>
-            {
-                GraphicsPath path = new GraphicsPath();
-                int radius = 15;
-                Rectangle rect = new Rectangle(0, 0, this.Width, this.Height);
-
-                path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y, radius, radius, 270, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y + rect.Height - radius, radius, radius, 0, 90);
-                path.AddArc(rect.X, rect.Y + rect.Height - radius, radius, radius, 90, 90);
-                this.Region = new Region(path);
-            };
-        }
+        
     }
 }

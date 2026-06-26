@@ -75,7 +75,7 @@ namespace MaxLight
                 CreateInitialsAvatar(avatar, title);
             }
 
-            // Заголовок
+            // Заголовок (имя юзера или группы)
             var titleLabel = new Label
             {
                 Text = title,
@@ -83,7 +83,7 @@ namespace MaxLight
                 ForeColor = Color.White,
                 AutoSize = true,
                 BackColor = Color.Transparent,
-                Location = new Point(FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN, FORM_PADDING + (AVATAR_SIZE / 2) - 10),
+                Location = new Point(FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN, FORM_PADDING),
                 Cursor = Cursors.Hand,
                 MaximumSize = new Size(formWidth - (FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN + CLOSE_BUTTON_SIZE + FORM_PADDING + 10), 0)
             };

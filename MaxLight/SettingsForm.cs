@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace MaxLight
 {
@@ -15,6 +16,8 @@ namespace MaxLight
         private Button btnPinSettings;
         private Button btnLogout;
         private Button btnAbout;
+        private Button btnCheckUpdates;  // ← НОВО
+        private Label lblUpdateStatus;   // ← НОВО: для отображения статуса
         private Button btnClose;
 
         // Элементы прокси
@@ -33,9 +36,11 @@ namespace MaxLight
         public event Action LogoutClicked;
         public event Action AboutClicked;
         public event Action ProxySettingsChanged;
+        public event Func<Task<bool>> CheckUpdatesClicked;  // ← ИЗМЕНЕНО: теперь возвращает Task<bool>
 
         private bool _isPortable;
         private ConfigManager.ProxySettings _originalProxySettings;
+        private bool _isChecking = false;
 
         public SettingsForm(bool isPortable = false)
         {
@@ -71,7 +76,7 @@ namespace MaxLight
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(66, 75, 121), // цвет верхней панели
+                BackColor = Color.FromArgb(66, 75, 121),
                 Height = 48,
                 Dock = DockStyle.Top
             };
@@ -106,8 +111,6 @@ namespace MaxLight
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
 
-
-
             rowY += 28;
             chkNotificationsOnTop = new CheckBox
             {
@@ -122,14 +125,13 @@ namespace MaxLight
 
             // ===== БЕЗОПАСНОСТЬ =====
             rowY += rowSpacing + 35;
-
             CreateSectionHeader("\uE72E", "Безопасность и аккаунт", new Point(leftColumnX + 28, rowY));
 
             rowY += 28;
             btnPinSettings = CreateStyledButton(
                 "\uE72E",
                 "Управление PIN-кодом",
-                Color.FromArgb(66, 75, 121), //цвет панели
+                Color.FromArgb(66, 75, 121),
                 new Size(220, 35),
                 new Point(leftColumnX + 20, rowY)
             );
@@ -258,17 +260,42 @@ namespace MaxLight
             grpProxy.Controls.Add(numProxyPort);
             grpProxy.Controls.Add(btnApplyProxy);
 
-            // ===== О ПРОГРАММЕ =====
+            // ===== О ПРОГРАММЕ и ПРОВЕРКА ОБНОВЛЕНИЙ =====
             rightRowY += 170;
+
+            //  КНОПКА "ПОИСК ОБНОВЛЕНИЙ" 
+            btnCheckUpdates = CreateStyledButton(
+                "\uE896",  // Иконка обновления
+                "Проверка обновлений",
+                Color.FromArgb(86, 86, 157), 
+                new Size(220, 35),
+                new Point(rightColumnX + 50, rightRowY)
+            );
+            btnCheckUpdates.Click += async (s, e) => await OnCheckUpdatesClicked();
+
+            // СТАТУС ОБНОВЛЕНИЯ (показывается вместо кнопки) 
+            lblUpdateStatus = new Label
+            {
+                Text = "",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(rightColumnX + 55, rightRowY + 8),
+                Size = new Size(210, 35),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Visible = false,
+                BackColor = Color.Transparent
+            };
+
+            // КНОПКА "О ПРОГРАММЕ" (под кнопкой проверки обновлений) 
+            rightRowY += 45;
             btnAbout = CreateStyledButton(
                 "\uE946",
                 "О ПРОГРАММЕ",
-                Color.FromArgb(66, 75, 121), //цвет кнопки
+                Color.FromArgb(66, 75, 121),
                 new Size(220, 35),
                 new Point(rightColumnX + 50, rightRowY)
             );
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
-
 
             // ===== КНОПКА ЗАКРЫТИЯ =====
             btnClose = new Button
@@ -314,8 +341,67 @@ namespace MaxLight
             this.Controls.Add(btnPinSettings);
             this.Controls.Add(btnLogout);
             this.Controls.Add(grpProxy);
+            this.Controls.Add(btnCheckUpdates);
+            this.Controls.Add(lblUpdateStatus);  // ← НОВО
             this.Controls.Add(btnAbout);
             this.Controls.Add(btnClose);
+        }
+
+        // ===== НОВЫЙ МЕТОД: Обработчик клика по кнопке проверки =====
+        private async Task OnCheckUpdatesClicked()
+        {
+            if (_isChecking) return;
+            _isChecking = true;
+
+            // Отключаем кнопку и показываем статус "Проверка..."
+            btnCheckUpdates.Visible = false;
+            lblUpdateStatus.Visible = true;
+            lblUpdateStatus.Text = "⏳ Проверка...";
+            lblUpdateStatus.ForeColor = Color.FromArgb(52, 152, 219);
+            this.Refresh();
+
+            try
+            {
+                // Вызываем проверку
+                bool hasUpdate = false;
+                if (CheckUpdatesClicked != null)
+                {
+                    hasUpdate = await CheckUpdatesClicked.Invoke();
+                }
+
+                // Показываем результат
+                if (hasUpdate)
+                {
+                    lblUpdateStatus.Text = "✅ Обновление найдено!";
+                    lblUpdateStatus.ForeColor = Color.FromArgb(46, 204, 113);
+
+                    // Через 3 секунды возвращаем кнопку
+                    await Task.Delay(3000);
+                }
+                else
+                {
+                    lblUpdateStatus.Text = "✅ Обновлений нет";
+                    lblUpdateStatus.ForeColor = Color.FromArgb(52, 152, 219);
+
+                    // Через 3 секунды возвращаем кнопку
+                    await Task.Delay(3000);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblUpdateStatus.Text = $"❌ Ошибка: {ex.Message}";
+                lblUpdateStatus.ForeColor = Color.FromArgb(231, 76, 60);
+
+                // Через 5 секунд возвращаем кнопку
+                await Task.Delay(5000);
+            }
+            finally
+            {
+                // Возвращаем кнопку
+                lblUpdateStatus.Visible = false;
+                btnCheckUpdates.Visible = true;
+                _isChecking = false;
+            }
         }
 
         // ===== МЕТОД ДЛЯ ЗАГОЛОВКОВ СЕКЦИЙ =====
