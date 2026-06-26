@@ -11,7 +11,7 @@ namespace MaxLight
         private Timer autoCloseTimer;
         private static int notificationCount = 0;
         private static object lockObj = new object();
-        private static bool _alwaysOnTop = true; // Статическая настройка по умолчанию
+        private static bool _alwaysOnTop = true;
 
         private string _userName;
         private Action<string> _onClick;
@@ -23,14 +23,12 @@ namespace MaxLight
 
         private Button closeButton;
 
-        // Глобальное свойство для настройки TopMost
         public static bool AlwaysOnTop
         {
             get { return _alwaysOnTop; }
             set { _alwaysOnTop = value; }
         }
 
-        // ========== НЕ ПЕРЕХВАТЫВАЕТ ФОКУС ==========
         protected override bool ShowWithoutActivation => true;
 
         public CustomNotification(string title, string message, string avatarUrl = null, Action<string> onClick = null)
@@ -40,23 +38,20 @@ namespace MaxLight
 
             InitializeComponents();
 
-            // Форматируем сообщение: ограничиваем 5 строками
             string displayMessage = FormatMessageToMaxLines(message, 5);
 
             this.Text = title;
+            int formWidth = 380;
+            int defaultHeight = 200;
+            this.ClientSize = new Size(formWidth, defaultHeight);
 
-            // Устанавливаем размер формы
-            int formWidth = 460;
-            this.ClientSize = new Size(formWidth, 200);
-
-            // Создаем главную панель
             var mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.Transparent
             };
 
-            // Аватарка
+            // ----- АВАТАРКА -----
             var avatar = new PictureBox
             {
                 Size = new Size(AVATAR_SIZE, AVATAR_SIZE),
@@ -67,61 +62,59 @@ namespace MaxLight
             };
 
             if (!string.IsNullOrEmpty(avatarUrl))
-            {
                 LoadAvatarAsync(avatar, avatarUrl, title);
-            }
             else
-            {
                 CreateInitialsAvatar(avatar, title);
-            }
 
-            // Заголовок
+            // ----- ЗАГОЛОВОК -----
             var titleLabel = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = true,
                 BackColor = Color.Transparent,
-                Location = new Point(FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN, FORM_PADDING + (AVATAR_SIZE / 2) - 10),
+                Location = new Point(FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN, FORM_PADDING + 4),
                 Cursor = Cursors.Hand,
-                MaximumSize = new Size(formWidth - (FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN + CLOSE_BUTTON_SIZE + FORM_PADDING + 10), 0)
+                MaximumSize = new Size(formWidth - (FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN + CLOSE_BUTTON_SIZE + FORM_PADDING + 15), 0)
             };
 
-            // Сообщение - на всю ширину
-            var messageLabel = new Label
-            {
-                Text = displayMessage,
-                Font = new Font("Segoe UI", 12),
-                ForeColor = Color.FromArgb(220, 220, 220),
-                BackColor = Color.Transparent,
-                Cursor = Cursors.Hand,
-                AutoSize = false,
-                MinimumSize = new Size(formWidth - FORM_PADDING * 2, 0),
-                MaximumSize = new Size(formWidth - FORM_PADDING * 2, 0),
-                TextAlign = ContentAlignment.TopLeft
-            };
+            // ----- СООБЩЕНИЕ  -----
+            var messageLabel = new Label();
+            messageLabel.Text = displayMessage;
+            messageLabel.Font = new Font("Segoe UI", 12);
+            messageLabel.ForeColor = Color.FromArgb(220, 220, 220);
+            messageLabel.BackColor = Color.Transparent;
+            messageLabel.Cursor = Cursors.Hand;
+            messageLabel.AutoSize = true;
+            messageLabel.MaximumSize = new Size(formWidth - FORM_PADDING * 2 - 12, 0);
+            messageLabel.Location = new Point(FORM_PADDING + 4, FORM_PADDING + AVATAR_SIZE + 10);
+            messageLabel.TextAlign = ContentAlignment.TopLeft;
 
-            // Рассчитываем позицию сообщения (под аватаркой)
-            int messageTop = FORM_PADDING + AVATAR_SIZE + 8;
-            int messageLeft = FORM_PADDING;
-
-            // Рассчитываем высоту для 5 строк
+            // Принудительно вычисляем размер
             using (Graphics g = messageLabel.CreateGraphics())
             {
-                float lineHeight = g.MeasureString("Sample text", messageLabel.Font).Height;
-                int calculatedHeight = (int)(lineHeight * 5.5);
+                SizeF size = g.MeasureString(displayMessage, messageLabel.Font, formWidth - FORM_PADDING * 2 - 12);
+                int neededHeight = (int)Math.Ceiling(size.Height);
+                int maxHeight = (int)(messageLabel.Font.Height * 5.8);
 
-                SizeF actualSize = g.MeasureString(displayMessage, messageLabel.Font, formWidth - FORM_PADDING * 2);
-                int actualHeight = (int)Math.Min(actualSize.Height, calculatedHeight);
-
-                messageLabel.Height = actualHeight;
-                messageLabel.Width = formWidth - FORM_PADDING * 2;
+                if (neededHeight > maxHeight)
+                {
+                    messageLabel.AutoSize = false;
+                    messageLabel.Height = maxHeight;
+                    messageLabel.Width = formWidth - FORM_PADDING * 2 - 12;
+                    // Обрезаем текст, если он всё ещё слишком длинный
+                    if (messageLabel.Text.Length > 200)
+                        messageLabel.Text = messageLabel.Text.Substring(0, 200) + "...";
+                }
+                else
+                {
+                    messageLabel.Height = neededHeight;
+                    messageLabel.Width = formWidth - FORM_PADDING * 2 - 12;
+                }
             }
 
-            messageLabel.Location = new Point(messageLeft, messageTop);
-
-            // Кнопка закрытия
+            // ----- КНОПКА ЗАКРЫТИЯ -----
             closeButton = new Button
             {
                 Text = "✕",
@@ -146,21 +139,18 @@ namespace MaxLight
                 this.Close();
             };
 
-            // Добавляем все элементы на форму
+            // ----- ДОБАВЛЯЕМ ВСЕ КОНТРОЛЫ -----
             mainPanel.Controls.Add(avatar);
             mainPanel.Controls.Add(titleLabel);
             mainPanel.Controls.Add(messageLabel);
             mainPanel.Controls.Add(closeButton);
-
             this.Controls.Add(mainPanel);
 
-            // ========== ОБРАБОТЧИКИ КЛИКОВ ==========
+            // ----- ОБРАБОТЧИКИ КЛИКОВ -----
             EventHandler clickHandler = (s, e) =>
             {
-                // Игнорируем клик по кнопке закрытия
                 if (s == closeButton || (s is Control && HasParent(s as Control, closeButton)))
                     return;
-
                 OnNotificationClick();
             };
 
@@ -170,21 +160,22 @@ namespace MaxLight
             messageLabel.Click += clickHandler;
             mainPanel.Click += clickHandler;
 
-            // Пересчитываем размер формы
-            int formHeight = messageLabel.Top + messageLabel.Height + FORM_PADDING;
+            // ----- ПЕРЕСЧЁТ ВЫСОТЫ ФОРМЫ -----
+            int formHeight = messageLabel.Top + messageLabel.Height + FORM_PADDING + 8;
+            if (formHeight < 120) formHeight = 120; // Минимальная высота
+
             this.ClientSize = new Size(formWidth, formHeight);
 
-            // Обновляем позицию кнопки после изменения размера
+            // Обновляем позицию кнопки
             closeButton.Location = new Point(this.ClientSize.Width - CLOSE_BUTTON_SIZE - FORM_PADDING, FORM_PADDING);
 
-            // Обновляем ширину сообщения
-            messageLabel.Width = this.ClientSize.Width - FORM_PADDING * 2;
-            messageLabel.MaximumSize = new Size(this.ClientSize.Width - FORM_PADDING * 2, 0);
+            // Обновляем заголовок
+            titleLabel.MaximumSize = new Size(
+                this.ClientSize.Width - (FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN + CLOSE_BUTTON_SIZE + FORM_PADDING + 15),
+                0
+            );
 
-            // Обновляем MaximumSize заголовка
-            titleLabel.MaximumSize = new Size(this.ClientSize.Width - (FORM_PADDING + AVATAR_SIZE + AVATAR_MARGIN + CLOSE_BUTTON_SIZE + FORM_PADDING + 10), 0);
-
-            // Авто-закрытие
+            // ----- АВТО-ЗАКРЫТИЕ -----
             autoCloseTimer = new Timer();
             autoCloseTimer.Interval = Math.Max(7000, displayMessage.Length / 15);
             autoCloseTimer.Tick += (s, e) => CloseNotification();
@@ -193,18 +184,22 @@ namespace MaxLight
             PositionNotification();
         }
 
+        // ========== ФОРМАТИРОВАНИЕ СООБЩЕНИЯ ==========
         private string FormatMessageToMaxLines(string message, int maxLines)
         {
             if (string.IsNullOrEmpty(message)) return message;
 
+            // Разбиваем на строки по \n или \r\n
             string[] lines = message.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
             if (lines.Length <= maxLines)
                 return message;
 
+            // Берем первые maxLines строк и добавляем "..."
             return string.Join(Environment.NewLine, lines, 0, maxLines) + "...";
         }
 
+        // ========== ОСТАЛЬНЫЕ МЕТОДЫ (без изменений) ==========
         private bool HasParent(Control child, Control parent)
         {
             Control current = child.Parent;
@@ -351,10 +346,8 @@ namespace MaxLight
             this.FormBorderStyle = FormBorderStyle.None;
             this.ShowInTaskbar = false;
             this.StartPosition = FormStartPosition.Manual;
-            this.BackColor = Color.FromArgb(45, 45, 48);
-            this.Opacity = 0.95;
-
-            // Используем глобальную настройку для TopMost
+            this.BackColor = Color.FromArgb(66, 75, 121);
+            this.Opacity = 1;
             this.TopMost = _alwaysOnTop;
 
             this.Load += (s, e) => SetRoundedRegion();

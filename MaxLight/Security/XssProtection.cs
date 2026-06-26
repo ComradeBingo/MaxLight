@@ -6,61 +6,74 @@ namespace MaxLight.Security
 {
     public static class XssProtection
     {
+        // Публичный список разрешенных типов (можно расширять извне)
+        public static string[] AllowedMessageTypes { get; set; } = new[]
+        {
+            "notification",
+            "auth_token_captured",
+            "device_id_captured",
+            "incoming_call",
+            "check_window_state" 
+        };
+
         public static async Task InjectProtectionScript(CoreWebView2 webView)
         {
             if (webView == null) return;
 
-            string protectionScript = @"
-        (function() {
+            // Формируем JSON-массив из списка
+            string allowedTypesJson = Newtonsoft.Json.JsonConvert.SerializeObject(AllowedMessageTypes);
+
+            string protectionScript = $@"
+        (function() {{
             // Сохраняем оригинальные методы немедленно
             var originalPostMessage = window.chrome.webview.postMessage.bind(window.chrome.webview);
             var originalGetItem = localStorage.getItem.bind(localStorage);
             var originalSetItem = localStorage.setItem.bind(localStorage);
             
-            // Защита postMessage через немедленную блокировку
-            var allowedTypes = ['notification', 'auth_token_captured', 'device_id_captured', 'incoming_call'];
+            // Разрешенные типы сообщений (из C#)
+            var allowedTypes = {allowedTypesJson};
             
-            window.chrome.webview.postMessage = function(message) {
-                try {
+            window.chrome.webview.postMessage = function(message) {{
+                try {{
                     var parsed = typeof message === 'string' ? JSON.parse(message) : message;
-                    if (parsed && allowedTypes.includes(parsed.type)) {
+                    if (parsed && allowedTypes.includes(parsed.type)) {{
                         return originalPostMessage(message);
-                    }
+                    }}
                     console.warn('XSS: blocked message type', parsed?.type);
-                } catch(e) {
+                }} catch(e) {{
                     console.warn('XSS: invalid message format');
-                }
-            };
+                }}
+            }};
             
             // Защита localStorage через defineProperty (неснимаемая)
             var protectedKeys = ['__oneme_auth', '__oneme_device_id'];
             
-            Object.defineProperty(localStorage, 'getItem', {
-                value: function(key) {
-                    if (protectedKeys.includes(key) && isSuspicious()) {
+            Object.defineProperty(localStorage, 'getItem', {{
+                value: function(key) {{
+                    if (protectedKeys.includes(key) && isSuspicious()) {{
                         console.warn('XSS: blocked getItem for', key);
                         return null;
-                    }
+                    }}
                     return originalGetItem(key);
-                },
+                }},
                 writable: false,
                 configurable: false
-            });
+            }});
             
-            Object.defineProperty(localStorage, 'setItem', {
-                value: function(key, value) {
-                    if (protectedKeys.includes(key) && isSuspicious()) {
+            Object.defineProperty(localStorage, 'setItem', {{
+                value: function(key, value) {{
+                    if (protectedKeys.includes(key) && isSuspicious()) {{
                         console.warn('XSS: blocked setItem for', key);
                         return;
-                    }
+                    }}
                     return originalSetItem(key, value);
-                },
+                }},
                 writable: false,
                 configurable: false
-            });
+            }});
             
-            function isSuspicious() {
-                try {
+            function isSuspicious() {{
+                try {{
                     // Проверяем наличие необычных фреймов
                     if (window !== window.top) return true;
                     
@@ -68,30 +81,30 @@ namespace MaxLight.Security
                     var stack = new Error().stack || '';
                     if (stack.includes('new Function') || 
                         stack.includes('eval') || 
-                        stack.includes('apply')) {
+                        stack.includes('apply')) {{
                         return true;
-                    }
+                    }}
                     
                     // Доп. проверка: атрибуты безопасности документа
-                    if (document.querySelector('script[nonce]')) {
+                    if (document.querySelector('script[nonce]')) {{
                         // Скорее всего CSP, скрипт легитимный
                         return false;
-                    }
+                    }}
                     
                     return false;
-                } catch(e) {
+                }} catch(e) {{
                     return true; // При ошибке — блокируем
-                }
-            }
+                }}
+            }}
             
             // Запечатываем объекты, чтобы нельзя было переопределить свойства обратно
-            if (Object.seal) {
+            if (Object.seal) {{
                 Object.seal(localStorage);
                 Object.seal(window.chrome?.webview);
-            }
+            }}
             
-            console.log('XSS Protection v2: active');
-        })();
+            console.log('XSS Protection v2: active, allowed types:', allowedTypes);
+        }})();
     ";
 
             await webView.AddScriptToExecuteOnDocumentCreatedAsync(protectionScript);

@@ -1,18 +1,25 @@
-﻿
-(function () {
+﻿(function () {
     console.log('=== Max Light: Парсер сообщений v7.3 ===');
 
     // Кеш отправленных сообщений
     var sentMessages = new Map();
-    var isWindowActive = true; // ПО УМОЛЧАНИЮ АКТИВНО (пока C# не скажет иначе)
+    var isWindowActive = true;
     var observer = null;
     var lastNotificationTime = 0;
-    var notificationCooldown = 2000;
+    var notificationCooldown = 2000; // АНТИФЛУД (задержка в мс), дублируется на всякий в c# в строке if ((now - lastNotificationTime).TotalMilliseconds < 5000)
 
     // Функция для обновления состояния из C#
     window.updateWindowActiveState = function (isActive) {
+        var previousState = isWindowActive;
         isWindowActive = isActive;
         console.log(isActive ? '🟢 Окно приложения активно - уведомления ОТКЛЮЧЕНЫ' : '🔴 Окно приложения неактивно - уведомления ВКЛЮЧЕНЫ');
+
+        // ===== НОВОЕ: Очищаем кеш при активации окна =====
+        if (isActive && previousState !== isActive) {
+            console.log('🧹 Очистка кеша сообщений (окно стало активным)');
+            sentMessages.clear();
+            console.log('✅ Кеш очищен, размер:', sentMessages.size);
+        }
     };
 
     // Отправка уведомления в C#
@@ -50,7 +57,6 @@
             var avatarImg = chatElement.querySelector('img.avatarImage.svelte-1aizpza');
             if (avatarImg && avatarImg.src) {
                 var avatarUrl = avatarImg.src;
-               // console.log('🖼️ Найдена аватарка:', avatarUrl);
                 return avatarUrl;
             }
 
@@ -94,14 +100,26 @@
         try {
             var messageSpan = chatElement.querySelector('.text.svelte-q2jdqb');
             if (messageSpan) {
+                // Получаем текст
                 var text = messageSpan.innerText.trim();
                 text = text.replace(/<!---->/g, '').trim();
+
+                // Нормализуем переносы строк: заменяем все \n и \r на пробелы,
+                // но сохраняем структуру "Имя: текст"
+                text = text.replace(/\n\s*:\s*/g, ': ');  // \n: -> : 
+                text = text.replace(/\n/g, ' ');          // остальные \n -> пробел
+                text = text.replace(/\s+/g, ' ');         // множественные пробелы -> один
+
                 if (text) return text;
             }
 
+            // Альтернативный поиск
             var anyMessageSpan = chatElement.querySelector('span[class*="text"]:not([class*="riu5uh"])');
             if (anyMessageSpan) {
                 var altText = anyMessageSpan.innerText.trim();
+                altText = altText.replace(/\n\s*:\s*/g, ': ');
+                altText = altText.replace(/\n/g, ' ');
+                altText = altText.replace(/\s+/g, ' ');
                 if (altText) return altText;
             }
 
@@ -148,7 +166,7 @@
         }
     }
 
-    // Генерация ID сообщения
+    // Генерация ID сообщения (ОСТАВЛЯЕМ КАК БЫЛО)
     function getMessageId(name, message) {
         if (!name || !message) return null;
 
@@ -170,7 +188,6 @@
             return [];
         }
 
-        
         var chatSelectors = [
             '.dialog',
             '.chat-item',
@@ -343,7 +360,7 @@
                             processNewChat(node);
                             if (node.querySelector && node.querySelector('.badgeIcon')) {
                                 console.log('🔔 Обнаружен бейдж непрочитанного сообщения');
-                                var chatElement = target.closest('.dialog, .chat-item, .cell, [class*="dialog"], [class*="chat"]');
+                                var chatElement = target ? target.closest('.dialog, .chat-item, .cell, [class*="dialog"], [class*="chat"]') : null;
                                 if (chatElement) {
                                     processNewChat(chatElement);
                                 }

@@ -44,17 +44,17 @@ namespace MaxLight
             this.SuspendLayout();
 
             // headerPanel
-            this.headerPanel.BackColor = Color.FromArgb(52, 73, 94);
+            this.headerPanel.BackColor = Color.FromArgb(66, 75, 121);
             this.headerPanel.Controls.Add(this.lblTitle);
             this.headerPanel.Dock = DockStyle.Top;
             this.headerPanel.Height = 60;
 
             // lblTitle
             this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new Font("Segoe UI", 16, FontStyle.Bold);
+            this.lblTitle.Font = new Font("Segoe UI", 14, FontStyle.Bold);
             this.lblTitle.ForeColor = Color.White;
             this.lblTitle.Location = new Point(20, 15);
-            this.lblTitle.Text = "🔐 Установка PIN-кода";
+            this.lblTitle.Text = "Установка PIN-кода";
 
             // lblMessage
             this.lblMessage.Font = new Font("Segoe UI", 11);
