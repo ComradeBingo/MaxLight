@@ -28,12 +28,12 @@ namespace MaxLight
         private void InitializeForm()
         {
             this.Text = "О программе";
-            this.Size = new Size(750, 480);
+            this.Size = new Size(750, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(750, 480);
-            this.MaximumSize = new Size(750, 480);
+            this.MinimumSize = new Size(750, 520);
+            this.MaximumSize = new Size(750, 520);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
@@ -90,7 +90,7 @@ namespace MaxLight
                        "• PIN-код (DPAPI шифрование)\n" +
                        "• Блокировка 8+ типов трекеров\n" +
                        "• Зашифрованное хранилище (AES-256)\n" +
-                       
+                       "• Счетчик непрочитанных сообщений в панели задач\n" +
                        "• Блокировка рекламного баннера\n" +
                        "• Уведомления в трее и панели задач\n" +
                        "• Лёгкие и быстрые дельта-обновления\n" +
@@ -184,13 +184,13 @@ namespace MaxLight
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Size = new Size(120, 38),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 415),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 465),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnOk.FlatAppearance.BorderSize = 0;
             btnOk.Click += (s, e) => this.Close();
-            btnOk.Location = new Point((this.ClientSize.Width - btnOk.Width) / 2, 415);
+            btnOk.Location = new Point((this.ClientSize.Width - btnOk.Width) / 2, 465);
 
             // Добавляем элементы
             headerPanel.Controls.Add(lblTitle);

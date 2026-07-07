@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace MaxLight
 {
@@ -16,8 +17,8 @@ namespace MaxLight
         private Button btnPinSettings;
         private Button btnLogout;
         private Button btnAbout;
-        private Button btnCheckUpdates;  // ← НОВО
-        private Label lblUpdateStatus;   // ← НОВО: для отображения статуса
+        private Button btnCheckUpdates;
+        private Label lblUpdateStatus;
         private Button btnClose;
 
         // Элементы прокси
@@ -29,6 +30,13 @@ namespace MaxLight
         private NumericUpDown numProxyPort;
         private Button btnApplyProxy;
 
+        // Элементы папки загрузок
+        private Label lblDownloadPath;
+        private TextBox txtDownloadPath;
+        private Button btnBrowseDownloadPath;
+        private Button btnResetDownloadPath;
+        public event Action<string> DownloadPathChanged;
+
         // События для связи с Form1
         public event Action AutoStartToggled;
         public event Action<bool> NotificationsOnTopToggled;
@@ -36,7 +44,7 @@ namespace MaxLight
         public event Action LogoutClicked;
         public event Action AboutClicked;
         public event Action ProxySettingsChanged;
-        public event Func<Task<bool>> CheckUpdatesClicked;  // ← ИЗМЕНЕНО: теперь возвращает Task<bool>
+        public event Func<Task<bool>> CheckUpdatesClicked;
 
         private bool _isPortable;
         private ConfigManager.ProxySettings _originalProxySettings;
@@ -51,6 +59,7 @@ namespace MaxLight
             LoadAutoStartState();
             LoadNotificationsOnTopState();
             LoadProxySettings();
+            LoadDownloadPath();
 
             if (_isPortable)
             {
@@ -64,12 +73,12 @@ namespace MaxLight
         private void InitializeForm()
         {
             this.Text = "Настройки Max Light";
-            this.Size = new Size(750, 480);
+            this.Size = new Size(750, 520);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(750, 480);
-            this.MaximumSize = new Size(750, 480);
+            this.MinimumSize = new Size(750, 520);
+            this.MaximumSize = new Size(750, 520);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
@@ -147,8 +156,35 @@ namespace MaxLight
             );
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
 
-            // ===== ПРОКСИ =====
+            // ===== ПРОВЕРКА ОБНОВЛЕНИЙ (ПЕРЕНЕСЕНО В ЛЕВУЮ КОЛОНКУ) =====
+            
+
+            rowY += 45;
+            btnCheckUpdates = CreateStyledButton(
+                "\uE896",
+                "Проверка обновлений",
+                Color.FromArgb(86, 86, 157),
+                new Size(220, 35),
+                new Point(leftColumnX + 20, rowY)
+            );
+            btnCheckUpdates.Click += async (s, e) => await OnCheckUpdatesClicked();
+
+            lblUpdateStatus = new Label
+            {
+                Text = "",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(leftColumnX + 30, rowY + 8),
+                Size = new Size(200, 35),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Visible = false,
+                BackColor = Color.Transparent
+            };
+
+            // ===== ПРАВАЯ КОЛОНКА =====
             int rightRowY = 100;
+
+            // ===== ПРОКСИ =====
             CreateSectionHeader("\uE774", "Настройки прокси", new Point(rightColumnX + 48, rightRowY));
 
             rightRowY += 30;
@@ -232,7 +268,6 @@ namespace MaxLight
             };
             btnApplyProxy.Click += (s, e) => ApplyProxySettings();
 
-            // Эффекты при наведении
             btnApplyProxy.MouseEnter += (s, e) =>
             {
                 btnApplyProxy.BackColor = ControlPaint.Light(Color.FromArgb(46, 204, 113), 0.3f);
@@ -241,7 +276,6 @@ namespace MaxLight
             {
                 btnApplyProxy.BackColor = Color.FromArgb(46, 204, 113);
             };
-
             btnApplyProxy.MouseDown += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left)
@@ -260,33 +294,63 @@ namespace MaxLight
             grpProxy.Controls.Add(numProxyPort);
             grpProxy.Controls.Add(btnApplyProxy);
 
-            // ===== О ПРОГРАММЕ и ПРОВЕРКА ОБНОВЛЕНИЙ =====
-            rightRowY += 170;
+            // ===== ПАПКА ЗАГРУЗОК =====
+            rightRowY += 160;
+            CreateSectionHeader("\uE896", "Папка загрузок", new Point(rightColumnX + 48, rightRowY));
 
-            //  КНОПКА "ПОИСК ОБНОВЛЕНИЙ" 
-            btnCheckUpdates = CreateStyledButton(
-                "\uE896",  // Иконка обновления
-                "Проверка обновлений",
-                Color.FromArgb(86, 86, 157), 
-                new Size(220, 35),
-                new Point(rightColumnX + 50, rightRowY)
-            );
-            btnCheckUpdates.Click += async (s, e) => await OnCheckUpdatesClicked();
+            rightRowY += 30;
 
-            // СТАТУС ОБНОВЛЕНИЯ (показывается вместо кнопки) 
-            lblUpdateStatus = new Label
+            // Строка с путем
+            lblDownloadPath = new Label
             {
-                Text = "",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Text = "Путь:",
+                Font = new Font("Segoe UI", 9),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(rightColumnX + 55, rightRowY + 8),
-                Size = new Size(210, 35),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Visible = false,
-                BackColor = Color.Transparent
+                Location = new Point(rightColumnX, rightRowY + 5),
+                AutoSize = true
             };
 
-            // КНОПКА "О ПРОГРАММЕ" (под кнопкой проверки обновлений) 
+            txtDownloadPath = new TextBox
+            {
+                Location = new Point(rightColumnX + 40, rightRowY),
+                Size = new Size(280, 25),
+                Font = new Font("Segoe UI", 9),
+                ReadOnly = true,
+                BackColor = Color.White
+            };
+
+            // Кнопки под строкой пути
+            rightRowY += 35;
+
+            btnBrowseDownloadPath = new Button
+            {
+                Text = "Обзор...",
+                Font = new Font("Segoe UI", 9),
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 1, BorderColor = Color.FromArgb(200, 200, 200) },
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Size = new Size(100, 30),
+                Location = new Point(rightColumnX + 70, rightRowY),
+                Cursor = Cursors.Hand
+            };
+            btnBrowseDownloadPath.Click += BrowseDownloadPath_Click;
+
+            btnResetDownloadPath = new Button
+            {
+                Text = "Сброс",
+                Font = new Font("Segoe UI", 9),
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 1, BorderColor = Color.FromArgb(200, 200, 200) },
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(231, 76, 60),
+                Size = new Size(100, 30),
+                Location = new Point(rightColumnX + 180, rightRowY),
+                Cursor = Cursors.Hand
+            };
+            btnResetDownloadPath.Click += ResetDownloadPath_Click;
+
+            // ===== О ПРОГРАММЕ =====
             rightRowY += 45;
             btnAbout = CreateStyledButton(
                 "\uE946",
@@ -307,13 +371,12 @@ namespace MaxLight
                 BackColor = Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Size = new Size(120, 38),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 415),
+                Location = new Point((this.ClientSize.Width - 120) / 2, 465),
                 Cursor = Cursors.Hand,
                 TextAlign = ContentAlignment.MiddleCenter
             };
             btnClose.Click += (s, e) => this.Close();
 
-            // Добавляем эффекты при наведении
             btnClose.MouseEnter += (s, e) =>
             {
                 btnClose.BackColor = ControlPaint.Light(Color.FromArgb(52, 152, 219), 0.3f);
@@ -322,7 +385,6 @@ namespace MaxLight
             {
                 btnClose.BackColor = Color.FromArgb(52, 152, 219);
             };
-
             btnClose.MouseDown += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left)
@@ -336,24 +398,82 @@ namespace MaxLight
 
             headerPanel.Controls.Add(lblTitle);
             this.Controls.Add(headerPanel);
+
+            // Левая колонка
             this.Controls.Add(chkAutoStart);
             this.Controls.Add(chkNotificationsOnTop);
             this.Controls.Add(btnPinSettings);
             this.Controls.Add(btnLogout);
-            this.Controls.Add(grpProxy);
             this.Controls.Add(btnCheckUpdates);
-            this.Controls.Add(lblUpdateStatus);  // ← НОВО
+            this.Controls.Add(lblUpdateStatus);
+
+            // Правая колонка
+            this.Controls.Add(grpProxy);
+            this.Controls.Add(lblDownloadPath);
+            this.Controls.Add(txtDownloadPath);
+            this.Controls.Add(btnBrowseDownloadPath);
+            this.Controls.Add(btnResetDownloadPath);
             this.Controls.Add(btnAbout);
             this.Controls.Add(btnClose);
         }
 
-        // ===== НОВЫЙ МЕТОД: Обработчик клика по кнопке проверки =====
+        // ===== МЕТОДЫ ДЛЯ ПАПКИ ЗАГРУЗОК =====
+        private void LoadDownloadPath()
+        {
+            string path = ConfigManager.GetDownloadPath();
+            txtDownloadPath.Text = path;
+        }
+
+        private void BrowseDownloadPath_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Выберите папку для загрузок";
+                dialog.ShowNewFolderButton = true;
+
+                if (!string.IsNullOrEmpty(txtDownloadPath.Text) && Directory.Exists(txtDownloadPath.Text))
+                {
+                    dialog.SelectedPath = txtDownloadPath.Text;
+                }
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    ConfigManager.SaveDownloadPath(dialog.SelectedPath);
+                    txtDownloadPath.Text = dialog.SelectedPath;
+
+                    DownloadPathChanged?.Invoke(dialog.SelectedPath);
+
+                    System.Diagnostics.Debug.WriteLine($"💾 Путь сохранен в config: {dialog.SelectedPath}");
+                }
+            }
+        }
+
+        private void ResetDownloadPath_Click(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Сбросить путь к папке загрузок по умолчанию?",
+                "Подтверждение",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                ConfigManager.SaveDownloadPath(null);
+                string defaultPath = ConfigManager.GetDownloadPath();
+                txtDownloadPath.Text = defaultPath;
+
+                DownloadPathChanged?.Invoke(defaultPath);
+
+                System.Diagnostics.Debug.WriteLine($"📁 Путь сброшен на: {defaultPath}");
+            }
+        }
+
+        // ===== ОСТАЛЬНЫЕ МЕТОДЫ =====
         private async Task OnCheckUpdatesClicked()
         {
             if (_isChecking) return;
             _isChecking = true;
 
-            // Отключаем кнопку и показываем статус "Проверка..."
             btnCheckUpdates.Visible = false;
             lblUpdateStatus.Visible = true;
             lblUpdateStatus.Text = "⏳ Проверка...";
@@ -362,28 +482,22 @@ namespace MaxLight
 
             try
             {
-                // Вызываем проверку
                 bool hasUpdate = false;
                 if (CheckUpdatesClicked != null)
                 {
                     hasUpdate = await CheckUpdatesClicked.Invoke();
                 }
 
-                // Показываем результат
                 if (hasUpdate)
                 {
                     lblUpdateStatus.Text = "✅ Обновление найдено!";
                     lblUpdateStatus.ForeColor = Color.FromArgb(46, 204, 113);
-
-                    // Через 3 секунды возвращаем кнопку
                     await Task.Delay(3000);
                 }
                 else
                 {
                     lblUpdateStatus.Text = "✅ Обновлений нет";
                     lblUpdateStatus.ForeColor = Color.FromArgb(52, 152, 219);
-
-                    // Через 3 секунды возвращаем кнопку
                     await Task.Delay(3000);
                 }
             }
@@ -391,20 +505,16 @@ namespace MaxLight
             {
                 lblUpdateStatus.Text = $"❌ Ошибка: {ex.Message}";
                 lblUpdateStatus.ForeColor = Color.FromArgb(231, 76, 60);
-
-                // Через 5 секунд возвращаем кнопку
                 await Task.Delay(5000);
             }
             finally
             {
-                // Возвращаем кнопку
                 lblUpdateStatus.Visible = false;
                 btnCheckUpdates.Visible = true;
                 _isChecking = false;
             }
         }
 
-        // ===== МЕТОД ДЛЯ ЗАГОЛОВКОВ СЕКЦИЙ =====
         private void CreateSectionHeader(string iconChar, string text, Point location)
         {
             Label iconLabel = new Label
@@ -431,7 +541,6 @@ namespace MaxLight
             this.Controls.Add(textLabel);
         }
 
-        // ===== МЕТОД ДЛЯ КНОПОК =====
         private Button CreateStyledButton(string iconChar, string text, Color backColor, Size size, Point location, float fontSize = 10)
         {
             var btn = new Button
@@ -486,7 +595,6 @@ namespace MaxLight
             {
                 btn.BackColor = backColor;
             };
-
             btn.MouseDown += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left)

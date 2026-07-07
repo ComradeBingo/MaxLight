@@ -50,6 +50,20 @@ namespace MaxLight
                     System.Diagnostics.Debug.WriteLine($"📊 Ответ на запрос состояния: {(isActive ? "Активно" : "Неактивно")}");
                 }
 
+                // ===== ОБРАБОТЧИК ДЛЯ СЧЕТЧИКА НЕПРОЧИТАННЫХ =====
+                if (data?.type == "unread_count")
+                {
+                    int count = data?.count ?? 0;
+
+                    // Обновляем счетчик в UI
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        UpdateUnreadCount(count);
+                    }));
+
+                    System.Diagnostics.Debug.WriteLine($"🔔 Обновлен счетчик непрочитанных: {count}");
+                }
+
                 if (data?.type == "notification")
                 {
                     string title = data.title ?? "Max Light";
@@ -57,12 +71,13 @@ namespace MaxLight
                     string avatar = data.avatar ?? null;
 
                     var now = DateTime.Now;
-                    if ((now - lastNotificationTime).TotalMilliseconds < 2000) // Дубль антифлуд защиты (в парсере js за это отвечает строка var notificationCooldown = 2000;)
+                    if ((now - lastNotificationTime).TotalMilliseconds < 2000)
                     {
                         return;
                     }
                     lastNotificationTime = now;
 
+                    // Увеличиваем счетчик при новом уведомлении
                     IncrementUnreadCount();
 
                     StartAttentionTimer();
@@ -95,6 +110,9 @@ namespace MaxLight
 
                 this.Activate();
                 webView.Focus();
+
+                // Сбрасываем счетчик при открытии чата
+                ResetUnreadCount();
 
                 string escapedName = EscapeJsString(userName);
 

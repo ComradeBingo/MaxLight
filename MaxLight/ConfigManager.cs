@@ -46,6 +46,9 @@ namespace MaxLight
 
             [JsonProperty("Proxy")]
             public ProxySettings Proxy { get; set; }
+
+            [JsonProperty("DownloadPath")]
+            public string DownloadPath { get; set; }
         }
 
         public class AuthData
@@ -288,6 +291,27 @@ namespace MaxLight
             return proxy;
         }
 
+        // ========== РАБОТА С ПАПКОЙ ЗАГРУЗОК ==========
+        public static void SaveDownloadPath(string path)
+        {
+            var config = LoadConfig();
+            config.DownloadPath = path;
+            SaveConfig(config);
+        }
+
+        public static string GetDownloadPath()
+        {
+            var config = LoadConfig();
+
+            // Если путь не задан или папка не существует, возвращаем стандартную папку загрузок
+            if (string.IsNullOrEmpty(config?.DownloadPath) || !Directory.Exists(config.DownloadPath))
+            {
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            }
+
+            return config.DownloadPath;
+        }
+
         // ========== ШИФРОВАНИЕ (DPAPI) ==========
         private static string EncryptData(string data)
         {
@@ -304,7 +328,5 @@ namespace MaxLight
             byte[] decryptedBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decryptedBytes);
         }
-
-        
     }
 }

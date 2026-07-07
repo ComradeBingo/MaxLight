@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Microsoft.WindowsAPICodePack.Taskbar;
+using System;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace MaxLight
@@ -84,6 +86,7 @@ namespace MaxLight
             return Icon.FromHandle(bitmap.GetHicon());
         }
 
+        // ===== ОБНОВЛЕНИЕ ИКОНКИ В ТРЕЕ =====
         private void UpdateTrayIcon(bool hasUnread, int count = 0)
         {
             if (trayIcon == null) return;
@@ -102,35 +105,122 @@ namespace MaxLight
             }
         }
 
+        // ===== БЕЙДЖ В ПАНЕЛИ ЗАДАЧ =====
+        private void UpdateTaskbarBadge(int count)
+        {
+            try
+            {
+                if (!TaskbarManager.IsPlatformSupported) return;
+
+                if (count <= 0)
+                {
+                    TaskbarManager.Instance.SetOverlayIcon(this.Handle, null, "");
+                    return;
+                }
+
+                using (Bitmap bitmap = CreateBadgeBitmap(count))
+                {
+                    IntPtr hIcon = bitmap.GetHicon();
+                    using (Icon icon = Icon.FromHandle(hIcon))
+                    {
+                        TaskbarManager.Instance.SetOverlayIcon(
+                            this.Handle,
+                            icon,
+                            $"{count} непрочитанных сообщений"
+                        );
+                    }
+                    DestroyIcon(hIcon);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Ошибка обновления бейджа: {ex.Message}");
+            }
+        }
+
+        // ===== СОЗДАНИЕ ИКОНКИ ДЛЯ БЕЙДЖА =====
+        private Bitmap CreateBadgeBitmap(int count)
+        {
+            int size = 16;
+            Bitmap bitmap = new Bitmap(size, size);
+
+            using (Graphics g = Graphics.FromImage(bitmap))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+                g.FillEllipse(Brushes.Red, 0, 0, size, size);
+
+                using (Pen pen = new Pen(Color.White, 1))
+                {
+                    g.DrawEllipse(pen, 0, 0, size - 1, size - 1);
+                }
+
+                string text = count > 9 ? "9+" : count.ToString();
+                using (Font font = new Font("Arial", 8, FontStyle.Bold))
+                {
+                    SizeF textSize = g.MeasureString(text, font);
+                    float x = (size - textSize.Width) / 2;
+                    float y = (size - textSize.Height) / 2 + 1;
+                    g.DrawString(text, font, Brushes.White, x, y);
+                }
+            }
+
+            return bitmap;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool DestroyIcon(IntPtr handle);
+
+        // ===== ГЛАВНЫЙ МЕТОД ОБНОВЛЕНИЯ СЧЕТЧИКА =====
+        public void UpdateUnreadCount(int count)
+        {
+            _unreadCount = count;
+
+            UpdateTaskbarBadge(count);
+
+            if (count > 0 && !IsWindowVisibleToUser())
+            {
+                UpdateTrayIcon(true, count);
+            }
+            else
+            {
+                UpdateTrayIcon(false, 0);
+            }
+
+            this.Text = count > 0 ? $"Max Light ({count})" : "Max Light";
+
+            if (count > 0 && !IsWindowVisibleToUser())
+            {
+                StartAttentionTimer();
+            }
+            else if (count == 0)
+            {
+                ResetAttention();
+            }
+
+            System.Diagnostics.Debug.WriteLine($"🔔 Обновлен счетчик: {count}");
+        }
+
         private bool IsWindowVisibleToUser()
         {
             return this.Visible && this.WindowState != FormWindowState.Minimized;
         }
 
+        // ===== УВЕЛИЧЕНИЕ СЧЕТЧИКА =====
         private void IncrementUnreadCount()
         {
-            _unreadCount++;
-            System.Diagnostics.Debug.WriteLine($"📊 Счетчик непрочитанных: {_unreadCount}");
-
-            if (!IsWindowVisibleToUser())
-            {
-                UpdateTrayIcon(true, _unreadCount);
-            }
-            else
-            {
-                if (!this.ContainsFocus)
-                {
-                    StartAttentionTimer();
-                }
-            }
+            int newCount = _unreadCount + 1;
+            UpdateUnreadCount(newCount);
+            System.Diagnostics.Debug.WriteLine($"📊 Счетчик непрочитанных: {newCount}");
         }
 
+        // ===== СБРОС СЧЕТЧИКА =====
         private void ResetUnreadCount()
         {
             if (_unreadCount > 0)
             {
-                _unreadCount = 0;
-                UpdateTrayIcon(false, 0);
+                UpdateUnreadCount(0);
                 System.Diagnostics.Debug.WriteLine($"📊 Счетчик непрочитанных сброшен");
             }
             StopFlashIcon();
@@ -156,6 +246,7 @@ namespace MaxLight
             this.Hide();
             this.ShowInTaskbar = false;
             _ = UpdateWebViewWindowState(false);
+
             if (_unreadCount > 0)
             {
                 UpdateTrayIcon(true, _unreadCount);

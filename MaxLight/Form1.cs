@@ -35,6 +35,8 @@ namespace MaxLight
         private Timer notificationFlashTimer;
         private bool isAttentionRequired = false;
         private const int ATTENTION_TIMEOUT_MS = 5000; //если юзер не кликнул пуш, то через сколько мс будет мигать иконка в панели задач
+        private PageModifier _pageModifier; //Код модификаторов для WebView2
+        private string _pendingDownloadPath; //путь загрузки файлов
 
         private int _unreadCount = 0;
         private Icon _normalIcon;
@@ -108,10 +110,10 @@ namespace MaxLight
         }
 
 
-        // ========== НОВО: Событие клика по уведомлению ==========
+        // ==========  Событие клика по уведомлению ==========
         public event EventHandler UpdateNotificationClicked;
 
-        // ========== НОВО: Показать уведомление в TitleBar ==========
+        // ==========  Показать уведомление в TitleBar ==========
         public void ShowUpdateNotification(string version)
         {
             if (titleBar != null)
@@ -125,19 +127,19 @@ namespace MaxLight
             }
         }
 
-        // ========== НОВО: Скрыть уведомление ==========
+        // ==========  Скрыть уведомление ==========
         public void HideUpdateNotification()
         {
             titleBar?.HideUpdateNotification();
         }
 
-        // ========== НОВО: Обработчик клика по уведомлению в TitleBar ==========
+        // ==========  Обработчик клика по уведомлению в TitleBar ==========
         private void OnTitleBarUpdateClick(object sender, EventArgs e)
         {
             UpdateNotificationClicked?.Invoke(this, EventArgs.Empty);
         }
 
-        // ========== НОВО: Проверка, есть ли обновление ==========
+        // ==========  Проверка, есть ли обновление ==========
         public bool HasUpdate => titleBar?.HasUpdate ?? false;
         public string UpdateVersion => titleBar?.UpdateVersion ?? "";
 
@@ -194,8 +196,12 @@ namespace MaxLight
                 Application.Restart();
                 Environment.Exit(0);
             };
-
-            //  подписываемся на событие проверки обновлений ★
+            // Подписка на изменение папки загрузок
+            settingsForm.DownloadPathChanged += async (path) =>
+            {
+                await UpdateDownloadFolderPath();
+            };
+            //  подписываемся на событие проверки обновлений 
             settingsForm.CheckUpdatesClicked += OnCheckUpdatesClickedAsync;
 
             settingsForm.ShowDialog(this);

@@ -35,7 +35,6 @@ namespace MaxLight
         // ========== ВСЕ МЕТОДЫ БЕЗОПАСНОСТИ ==========
 
         // ===== АВТОРИЗАЦИЯ =====
-
         private void SaveAuthDataToRegistry(string token, long? viewerId, string deviceId)
         {
             try
@@ -92,7 +91,6 @@ namespace MaxLight
         }
 
         // ===== PIN-КОД =====
-
         private string GetSavedPin()
         {
             try
@@ -208,9 +206,9 @@ namespace MaxLight
             if (webView?.CoreWebView2 != null)
             {
                 string script = @"
-            localStorage.removeItem('__oneme_auth');
-            localStorage.removeItem('__oneme_device_id');
-        ";
+                    localStorage.removeItem('__oneme_auth');
+                    localStorage.removeItem('__oneme_device_id');
+                ";
                 await webView.CoreWebView2.ExecuteScriptAsync(script);
             }
 
@@ -219,7 +217,6 @@ namespace MaxLight
         }
 
         // ===== ПОДСВЕТКА ИКОНКИ В ПАНЕЛИ ЗАДАЧ =====
-
         private void StartFlashIcon()
         {
             if (this.IsDisposed) return;

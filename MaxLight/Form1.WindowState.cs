@@ -45,8 +45,49 @@ namespace MaxLight
 
         private void OnWindowActivated(object sender, EventArgs e)
         {
+            // Если окно свернуто при активации, разворачиваем
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.WindowState = FormWindowState.Normal;
+                this.ShowInTaskbar = true;
+                System.Diagnostics.Debug.WriteLine("📌 Окно развернуто при активации");
+            }
+
+            // ===== СБРАСЫВАЕМ СЧЕТЧИК ПРИ АКТИВАЦИИ ОКНА =====
+            if (_unreadCount > 0)
+            {
+                ResetUnreadCount();
+                _ = ResetUnreadCountInWebView();
+                System.Diagnostics.Debug.WriteLine("📊 Счетчик сброшен при активации окна");
+            }
+
             SetWindowActiveState(true);
             UpdateCurrentScreen();
+            ResetAttention();
+        }
+
+        private async Task ResetUnreadCountInWebView()
+        {
+            if (webView?.CoreWebView2 == null) return;
+
+            try
+            {
+                string script = @"
+            try {
+                if (typeof resetUnreadCount === 'function') {
+                    resetUnreadCount();
+                    console.log('[MaxLight] Счетчик сброшен в JS');
+                }
+            } catch(e) {
+                console.log('[MaxLight] Ошибка сброса счетчика в JS:', e);
+            }
+        ";
+                await webView.CoreWebView2.ExecuteScriptAsync(script);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Ошибка сброса счетчика: {ex.Message}");
+            }
         }
 
         private void OnWindowDeactivated(object sender, EventArgs e)
@@ -238,7 +279,7 @@ namespace MaxLight
 
                 if (command == SC_MINIMIZE)
                 {
-                    System.Diagnostics.Debug.WriteLine("📌 Сворачивание из панели задач");
+                    System.Diagnostics.Debug.WriteLine("📌 Сворачивание в панель задач");
                     base.WndProc(ref m);
                     _ = UpdateWebViewWindowState(false);
                     return;
@@ -247,6 +288,15 @@ namespace MaxLight
                 {
                     System.Diagnostics.Debug.WriteLine("📌 Разворачивание из панели задач");
                     base.WndProc(ref m);
+
+                    // ===== СБРАСЫВАЕМ СЧЕТЧИК ПРИ РАЗВОРАЧИВАНИИ ИЗ ПАНЕЛИ ЗАДАЧ =====
+                    if (_unreadCount > 0)
+                    {
+                        ResetUnreadCount();
+                        _ = ResetUnreadCountInWebView();
+                        System.Diagnostics.Debug.WriteLine("📊 Счетчик сброшен при разворачивании из панели задач");
+                    }
+
                     if (this.ContainsFocus)
                     {
                         _ = UpdateWebViewWindowState(true);

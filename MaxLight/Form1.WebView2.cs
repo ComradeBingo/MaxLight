@@ -25,6 +25,9 @@ namespace MaxLight
             Controls.Add(webView);
             webView.SendToBack();
 
+            // Инициализируем модификатор страницы
+            _pageModifier = new PageModifier(webView);
+
             this.Load += (s, e) => UpdateWebViewPosition();
             this.Resize += (s, e) => UpdateWebViewPosition();
 
@@ -75,6 +78,29 @@ namespace MaxLight
                 var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
                 await webView.EnsureCoreWebView2Async(env);
 
+                // ===== УСТАНАВЛИВАЕМ ПАПКУ ЗАГРУЗОК ЧЕРЕЗ PROFILE =====
+                try
+                {
+                    string downloadPath = ConfigManager.GetDownloadPath();
+
+                    // Проверяем, существует ли папка, если нет - создаем
+                    if (!Directory.Exists(downloadPath))
+                    {
+                        Directory.CreateDirectory(downloadPath);
+                        System.Diagnostics.Debug.WriteLine($"📁 Создана папка загрузок: {downloadPath}");
+                    }
+
+                    // Устанавливаем папку загрузок через профиль
+                    webView.CoreWebView2.Profile.DefaultDownloadFolderPath = downloadPath;
+
+                    System.Diagnostics.Debug.WriteLine($"📁 Папка загрузок установлена: {downloadPath}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❌ Ошибка установки папки загрузок: {ex.Message}");
+                    // Если не удалось установить, используем стандартную папку
+                }
+
                 bool hasAuth = await CheckAndRestoreAuth();
 
                 if (!hasAuth)
@@ -88,8 +114,10 @@ namespace MaxLight
                     _authRestored = true;
                 }
 
-                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("setInterval(()=>{const e=document.querySelector('.infobar.svelte-1aijhs3');if(e)e.remove()},100);");
+                // Инициализация модификаторов WebView2
+                await _pageModifier.InitializeModificationsAsync();
 
+                // Подгрузка XSS защиты
                 await XssProtection.InjectProtectionScript(webView.CoreWebView2);
 
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
@@ -125,6 +153,9 @@ namespace MaxLight
                             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
                             await webView.CoreWebView2.ExecuteScriptAsync(script);
                         }
+
+                        // ===== ПРИМЕНЕНИЕ МОДИФИКАЦИЙ ПРИ НАВИГАЦИИ =====
+                        await _pageModifier.ApplyModificationsOnNavigationAsync();
 
                         await UpdateWebViewWindowState(this.ContainsFocus);
                     }
@@ -168,6 +199,33 @@ namespace MaxLight
                 MessageBox.Show($"Ошибка инициализации WebView2: {ex.Message}\n\nУстановите WebView2 Runtime",
                     "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ShowConnectionError();
+            }
+        }
+
+        // ===== МЕТОД ДЛЯ ОБНОВЛЕНИЯ ПАПКИ ЗАГРУЗОК (если пользователь изменил настройки) =====
+        public async Task UpdateDownloadFolderPath()
+        {
+            try
+            {
+                if (webView?.CoreWebView2?.Profile != null)
+                {
+                    string downloadPath = ConfigManager.GetDownloadPath();
+
+                    // Проверяем, существует ли папка
+                    if (!Directory.Exists(downloadPath))
+                    {
+                        Directory.CreateDirectory(downloadPath);
+                    }
+
+                    // Обновляем папку загрузок
+                    webView.CoreWebView2.Profile.DefaultDownloadFolderPath = downloadPath;
+
+                    System.Diagnostics.Debug.WriteLine($"📁 Папка загрузок обновлена: {downloadPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Ошибка обновления папки загрузок: {ex.Message}");
             }
         }
 
