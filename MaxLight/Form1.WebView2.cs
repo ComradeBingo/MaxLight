@@ -38,21 +38,17 @@ namespace MaxLight
         {
             string rootFolder = Application.StartupPath;
 
-            if (Path.GetFileName(rootFolder).Equals("current", StringComparison.OrdinalIgnoreCase))
-            {
-                rootFolder = Path.GetFullPath(Path.Combine(rootFolder, ".."));
-            }
-
-            string dataFolder = Path.Combine(rootFolder, "WebView2Data");
+            // Вместо фиксированной папки WebView2Data, создаем уникальную папку под текущую сессию
+            string uniqueSessionId = Guid.NewGuid().ToString();
+            string dataFolder = Path.Combine(rootFolder, "WebView2Sessions", uniqueSessionId);
 
             if (!Directory.Exists(dataFolder))
             {
                 Directory.CreateDirectory(dataFolder);
             }
-
-            System.Diagnostics.Debug.WriteLine($"📁 Папка WebView2: {dataFolder}");
             return dataFolder;
         }
+
 
         private async Task InitializeWebViewAsync(string userDataFolder)
         {
@@ -60,7 +56,7 @@ namespace MaxLight
             {
                 var options = new CoreWebView2EnvironmentOptions
                 {
-                    AdditionalBrowserArguments = "--inprivate"
+                    AdditionalBrowserArguments = "--incognito"
                 };
 
                 var proxyConfig = ConfigManager.GetProxySettings();
@@ -105,6 +101,17 @@ namespace MaxLight
 
                 if (!hasAuth)
                 {
+                    // Нет токена - показываем настройки (первый запуск программы)
+                    System.Diagnostics.Debug.WriteLine("[MaxLight] ⚠️ Токен не найден, открываем настройки");
+
+                    // Открываем настройки с небольшой задержкой
+                    await Task.Delay(1000);
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        ShowSettings();
+                    }));
+
+                    // Включаем перехват токена
                     await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(GetTokenInterceptorScript());
                     _tokenParserActive = true;
                 }
