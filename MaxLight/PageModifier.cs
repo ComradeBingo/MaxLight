@@ -9,57 +9,77 @@ namespace MaxLight
     /// <summary>
     /// Управляет модификациями HTML/JS страницы в WebView2
     /// </summary>
-    public class PageModifier
+    public class PageModifier : IDisposable
     {
         private readonly WebView2 _webView;
         private readonly List<IPageModification> _modifications = new List<IPageModification>();
         private bool _isInitialized = false;
+        private bool _disposed = false;
 
         public PageModifier(WebView2 webView)
         {
             _webView = webView ?? throw new ArgumentNullException(nameof(webView));
             RegisterDefaultModifications();
+
+            _webView.CoreWebView2InitializationCompleted += OnCoreWebView2InitializationCompleted;
         }
 
-        /// <summary>
-        /// Регистрация модификаций по умолчанию
-        /// </summary>
+        private void OnCoreWebView2InitializationCompleted(object sender, CoreWebView2InitializationCompletedEventArgs e)
+        {
+            if (e.IsSuccess && _webView.CoreWebView2 != null)
+            {
+                _webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
+                _ = InterceptClicksViaJavaScriptAsync();
+            }
+        }
+
+        private void OnNewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = e.Uri,
+                    UseShellExecute = true
+                });
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PageModifier] Ошибка открытия ссылки: {ex.Message}");
+            }
+        }
+
         private void RegisterDefaultModifications()
         {
-            // 1. Удаление атрибута style у .content.svelte-19qvtly (чтобы картинки открывались в большем разрешении)
-            _modifications.Add(new RemoveStyleModification(
-                ".content.svelte-19qvtly",
-                "style"
-            ));
-
-            // 2. Удаление баннера .infobar.svelte-1aijhs3 (сносим рекламный баннер)
-            _modifications.Add(new RemoveElementModification(
-                ".infobar.svelte-1aijhs3",
-                "setInterval"
-            ));
+            _modifications.Add(new RemoveStyleModification(".content.svelte-19qvtly", "style"));
+            _modifications.Add(new RemoveElementModification(".infobar.svelte-1aijhs3", "setInterval"));
         }
 
-        /// <summary>
-        /// Инициализация всех модификаций (вызывается при создании WebView)
-        /// </summary>
         public async Task InitializeModificationsAsync()
         {
             if (_isInitialized) return;
 
             foreach (var modification in _modifications)
             {
-                await modification.ApplyOnDocumentCreatedAsync(_webView.CoreWebView2);
+                try
+                {
+                    await modification.ApplyOnDocumentCreatedAsync(_webView.CoreWebView2);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PageModifier] Ошибка инициализации {modification.Name}: {ex.Message}");
+                }
             }
 
             _isInitialized = true;
             System.Diagnostics.Debug.WriteLine($"[PageModifier] Инициализировано {_modifications.Count} модификаций");
         }
 
-        /// <summary>
-        /// Применение модификаций после загрузки страницы
-        /// </summary>
         public async Task ApplyModificationsOnNavigationAsync()
         {
+            if (_disposed) return;
+
             if (!_isInitialized)
             {
                 await InitializeModificationsAsync();
@@ -67,38 +87,117 @@ namespace MaxLight
 
             foreach (var modification in _modifications)
             {
-                await modification.ApplyOnNavigationAsync(_webView.CoreWebView2);
+                if (_disposed) break;
+
+                try
+                {
+                    if (_webView.CoreWebView2 != null)
+                    {
+                        await modification.ApplyOnNavigationAsync(_webView.CoreWebView2);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PageModifier] Ошибка применения {modification.Name}: {ex.Message}");
+                }
+            }
+
+            if (_webView.CoreWebView2 != null)
+            {
+                await InterceptClicksViaJavaScriptAsync();
             }
         }
 
-        /// <summary>
-        /// Добавление новой модификации во время выполнения
-        /// </summary>
+        private async Task InterceptClicksViaJavaScriptAsync()
+        {
+            if (_webView.CoreWebView2 == null) return;
+
+            try
+            {
+                string script = @"
+                    (function() {
+                        if (window.__maxlight_link_handler_installed) return;
+                        
+                        function openInBrowser(url) {
+                            if (url && !url.startsWith('javascript:') && !url.startsWith('#')) {
+                                window.open(url, '_blank');
+                                return true;
+                            }
+                            return false;
+                        }
+                        
+                        document.addEventListener('click', function(e) {
+                            var target = e.target;
+                            while (target && target.tagName !== 'A') {
+                                target = target.parentElement;
+                            }
+                            
+                            if (target && target.tagName === 'A') {
+                                var href = target.getAttribute('href');
+                                if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+                                    if (openInBrowser(href)) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }
+                                }
+                            }
+                        }, true);
+                        
+                        var originalWindowOpen = window.open;
+                        window.open = function(url, name, features) {
+                            if (url && typeof url === 'string' && 
+                                !url.startsWith('javascript:') && 
+                                !url.startsWith('#')) {
+                                openInBrowser(url);
+                                return null;
+                            }
+                            return originalWindowOpen.call(this, url, name, features);
+                        };
+                        
+                        window.__maxlight_link_handler_installed = true;
+                    })();
+                ";
+
+                await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
+                await _webView.CoreWebView2.ExecuteScriptAsync(script);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[PageModifier] Ошибка перехвата ссылок: {ex.Message}");
+            }
+        }
+
         public void AddModification(IPageModification modification)
         {
             _modifications.Add(modification);
-            System.Diagnostics.Debug.WriteLine($"[PageModifier] Добавлена модификация: {modification.Name}");
         }
 
-        /// <summary>
-        /// Удаление модификации
-        /// </summary>
         public bool RemoveModification(string name)
         {
             var mod = _modifications.Find(m => m.Name == name);
             if (mod != null)
             {
                 _modifications.Remove(mod);
-                System.Diagnostics.Debug.WriteLine($"[PageModifier] Удалена модификация: {name}");
                 return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// Получение всех модификаций
-        /// </summary>
         public IReadOnlyList<IPageModification> GetModifications() => _modifications.AsReadOnly();
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            if (_webView.CoreWebView2 != null)
+            {
+                _webView.CoreWebView2.NewWindowRequested -= OnNewWindowRequested;
+            }
+            _webView.CoreWebView2InitializationCompleted -= OnCoreWebView2InitializationCompleted;
+
+            _modifications.Clear();
+            _disposed = true;
+        }
     }
 
     /// <summary>
@@ -109,15 +208,7 @@ namespace MaxLight
         string Name { get; }
         string Description { get; }
         bool IsEnabled { get; set; }
-
-        /// <summary>
-        /// Применяется при создании документа (через AddScriptToExecuteOnDocumentCreatedAsync)
-        /// </summary>
         Task ApplyOnDocumentCreatedAsync(CoreWebView2 coreWebView);
-
-        /// <summary>
-        /// Применяется при навигации (через ExecuteScriptAsync)
-        /// </summary>
         Task ApplyOnNavigationAsync(CoreWebView2 coreWebView);
     }
 
@@ -145,39 +236,15 @@ namespace MaxLight
 
             string script = $@"
                 (function() {{
-                    function removeAttributeFromElement() {{
+                    function removeAttribute() {{
                         var element = document.querySelector('{_selector}');
                         if (element && element.hasAttribute('{_attribute}')) {{
                             element.removeAttribute('{_attribute}');
-                            console.log('[MaxLight] Удален атрибут {_attribute} из {_selector}');
-                            return true;
                         }}
-                        return false;
                     }}
                     
-                    // Запускаем сразу
-                    setTimeout(removeAttributeFromElement, 50);
-                    
-                    // Наблюдатель за изменениями
-                    var observer = new MutationObserver(function() {{
-                        removeAttributeFromElement();
-                    }});
-                    
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        observer.observe(document.body, {{
-                            childList: true,
-                            subtree: true,
-                            attributes: true,
-                            attributeFilter: ['{_attribute}']
-                        }});
-                    }});
-                    
-                    // Автоматическое отключение через 30 секунд
-                    setTimeout(function() {{
-                        observer.disconnect();
-                    }}, 30000);
-                    
-                    console.log('[MaxLight] Установлена модификация: {Name}');
+                    setTimeout(removeAttribute, 50);
+                    document.addEventListener('DOMContentLoaded', removeAttribute);
                 }})();
             ";
 
@@ -193,7 +260,6 @@ namespace MaxLight
                     var element = document.querySelector('{_selector}');
                     if (element && element.hasAttribute('{_attribute}')) {{
                         element.removeAttribute('{_attribute}');
-                        console.log('[MaxLight] Удален атрибут {_attribute} при навигации');
                     }}
                 }})();
             ";
@@ -230,23 +296,23 @@ namespace MaxLight
                         var element = document.querySelector('{_selector}');
                         if (element) {{
                             element.remove();
-                            console.log('[MaxLight] Удален элемент: {_selector}');
                             return true;
                         }}
                         return false;
                     }}
                     
                     if ('{_executionType}' === 'setInterval') {{
-                        // Для баннера с setInterval
-                        setInterval(function() {{
-                            removeElement();
+                        removeElement();
+                        var intervalId = setInterval(function() {{
+                            if (removeElement()) {{
+                                clearInterval(intervalId);
+                            }}
                         }}, 100);
+                        setTimeout(function() {{ clearInterval(intervalId); }}, 30000);
                     }} else {{
                         setTimeout(removeElement, 50);
                         document.addEventListener('DOMContentLoaded', removeElement);
                     }}
-                    
-                    console.log('[MaxLight] Установлена модификация: {Name}');
                 }})();
             ";
 
@@ -262,7 +328,6 @@ namespace MaxLight
                     var element = document.querySelector('{_selector}');
                     if (element) {{
                         element.remove();
-                        console.log('[MaxLight] Удален элемент при навигации: {_selector}');
                     }}
                 }})();
             ";
@@ -295,10 +360,10 @@ namespace MaxLight
             await coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(_script);
         }
 
-        public async Task ApplyOnNavigationAsync(CoreWebView2 coreWebView)
+        public async Task ApplyOnNavigationAsync(CoreWebView2 webView)
         {
             if (!IsEnabled) return;
-            await coreWebView.ExecuteScriptAsync(_script);
+            await webView.ExecuteScriptAsync(_script);
         }
     }
 }

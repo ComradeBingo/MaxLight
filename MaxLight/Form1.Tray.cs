@@ -39,7 +39,7 @@ namespace MaxLight
 
             contextMenu.Items.Add(new ToolStripSeparator());
 
-            var exitItem = new ToolStripMenuItem("Выйти");
+            var exitItem = new ToolStripMenuItem("Закрыть MaxLight");
             exitItem.Click += (s, e) =>
             {
                 exitRequested = true;
@@ -149,15 +149,20 @@ namespace MaxLight
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-                g.FillEllipse(Brushes.Red, 0, 0, size, size);
 
-                using (Pen pen = new Pen(Color.White, 1))
-                {
-                    g.DrawEllipse(pen, 0, 0, size - 1, size - 1);
-                }
+                g.FillEllipse(new SolidBrush(Color.FromArgb(210, 31, 60)), 0, 0, size, size);
+
+
+                //старый стиль бейджа
+                //g.FillEllipse(Brushes.Red, 0, 0, size, size);
+               // using (Pen pen = new Pen(Color.White, 1))
+               // {
+                //    g.DrawEllipse(pen, 0, 0, size - 1, size - 1);
+               // }
 
                 string text = count > 9 ? "9+" : count.ToString();
-                using (Font font = new Font("Arial", 8, FontStyle.Bold))
+                 using (Font font = new Font("Arial", 8, FontStyle.Bold))
+                
                 {
                     SizeF textSize = g.MeasureString(text, font);
                     float x = (size - textSize.Width) / 2;
