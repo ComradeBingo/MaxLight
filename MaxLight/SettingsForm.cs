@@ -33,9 +33,12 @@ namespace MaxLight
         // Элементы папки загрузок
         private Label lblDownloadPath;
         private TextBox txtDownloadPath;
+        private CheckBox chkAskEveryTime;
         private Button btnBrowseDownloadPath;
         private Button btnResetDownloadPath;
         public event Action<string> DownloadPathChanged;
+
+        public event Action AskEveryTimeToggled;
 
         // События для связи с Form1
         public event Action AutoStartToggled;
@@ -50,9 +53,19 @@ namespace MaxLight
         private ConfigManager.ProxySettings _originalProxySettings;
         private bool _isChecking = false;
 
+        // ===== DPI МАСШТАБИРОВАНИЕ =====
+        private float _currentScale = 1.0f;
+        private const int BASE_WIDTH = 750;
+        private const int BASE_HEIGHT = 520;
+
         public SettingsForm(bool isPortable = false)
         {
             _isPortable = isPortable;
+
+            // ===== ВКЛЮЧАЕМ ПОДДЕРЖКУ DPI =====
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+            this.DpiChanged += SettingsForm_DpiChanged;
 
             InitializeForm();
 
@@ -70,15 +83,62 @@ namespace MaxLight
             }
         }
 
+        // ===== ОБРАБОТЧИК ИЗМЕНЕНИЯ DPI =====
+        private void SettingsForm_DpiChanged(object sender, DpiChangedEventArgs e)
+        {
+            _currentScale = e.DeviceDpiNew / 96f;
+            UpdateScale(_currentScale);
+        }
+
+        private void UpdateScale(float scale)
+        {
+            // Обновляем размер формы
+            int newWidth = (int)(BASE_WIDTH * scale);
+            int newHeight = (int)(BASE_HEIGHT * scale);
+            this.Size = new Size(newWidth, newHeight);
+            this.MinimumSize = new Size(newWidth, newHeight);
+            this.MaximumSize = new Size(newWidth, newHeight);
+
+            // Обновляем шрифты
+            this.Font = new Font("Segoe UI", 9f * scale, FontStyle.Regular, GraphicsUnit.Point);
+
+            // Пересчитываем позиции элементов
+            RecalculateLayout(scale);
+        }
+
+        private void RecalculateLayout(float scale)
+        {
+            int leftColumnX = (int)(30 * scale);
+            int rightColumnX = (int)(390 * scale);
+            int rowY = (int)(100 * scale);
+            int rowSpacing = (int)(35 * scale);
+            int buttonWidth = (int)(220 * scale);
+            int buttonHeight = (int)(35 * scale);
+
+            // Обновляем позиции элементов (пример для левой колонки)
+            chkAutoStart.Location = new Point(leftColumnX + (int)(30 * scale), rowY);
+            chkAutoStart.Font = new Font("Segoe UI", 10f * scale);
+
+            rowY += (int)(28 * scale);
+            chkNotificationsOnTop.Location = new Point(leftColumnX + (int)(30 * scale), rowY += rowSpacing);
+            chkNotificationsOnTop.Font = new Font("Segoe UI", 10f * scale);
+
+            
+        }
+
         private void InitializeForm()
         {
+            // ===== НАСТРОЙКА DPI =====
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+
             this.Text = "Настройки Max Light";
-            this.Size = new Size(750, 520);
+            this.Size = new Size(BASE_WIDTH, BASE_HEIGHT);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(750, 520);
-            this.MaximumSize = new Size(750, 520);
+            this.MinimumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
+            this.MaximumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
@@ -156,9 +216,7 @@ namespace MaxLight
             );
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
 
-            // ===== ПРОВЕРКА ОБНОВЛЕНИЙ (ПЕРЕНЕСЕНО В ЛЕВУЮ КОЛОНКУ) =====
-            
-
+            // ===== ПРОВЕРКА ОБНОВЛЕНИЙ =====
             rowY += 45;
             btnCheckUpdates = CreateStyledButton(
                 "\uE896",
@@ -180,6 +238,17 @@ namespace MaxLight
                 Visible = false,
                 BackColor = Color.Transparent
             };
+
+            // ===== О ПРОГРАММЕ (в левой колонке) =====
+            rowY += 45;
+            btnAbout = CreateStyledButton(
+                "\uE946",
+                "О ПРОГРАММЕ",
+                Color.FromArgb(66, 75, 121),
+                new Size(220, 35),
+                new Point(leftColumnX + 20, rowY)
+            );
+            btnAbout.Click += (s, e) => AboutClicked?.Invoke();
 
             // ===== ПРАВАЯ КОЛОНКА =====
             int rightRowY = 100;
@@ -320,7 +389,7 @@ namespace MaxLight
             };
 
             // Кнопки под строкой пути
-            rightRowY += 35;
+            rightRowY += 45;
 
             btnBrowseDownloadPath = new Button
             {
@@ -350,16 +419,22 @@ namespace MaxLight
             };
             btnResetDownloadPath.Click += ResetDownloadPath_Click;
 
-            // ===== О ПРОГРАММЕ =====
-            rightRowY += 45;
-            btnAbout = CreateStyledButton(
-                "\uE946",
-                "О ПРОГРАММЕ",
-                Color.FromArgb(66, 75, 121),
-                new Size(220, 35),
-                new Point(rightColumnX + 50, rightRowY)
-            );
-            btnAbout.Click += (s, e) => AboutClicked?.Invoke();
+            // Чекбокс "Спрашивать каждый раз" - под кнопками
+            rightRowY += 40;
+            chkAskEveryTime = new CheckBox
+            {
+                Text = "Спрашивать каждый раз при скачивании",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Location = new Point(rightColumnX, rightRowY),
+                AutoSize = true,
+                Cursor = Cursors.Hand
+            };
+            chkAskEveryTime.CheckedChanged += (s, e) =>
+            {
+                AskEveryTimeToggled?.Invoke();
+                ConfigManager.SaveAskEveryTime(chkAskEveryTime.Checked);
+            };
 
             // ===== КНОПКА ЗАКРЫТИЯ =====
             btnClose = new Button
@@ -406,6 +481,7 @@ namespace MaxLight
             this.Controls.Add(btnLogout);
             this.Controls.Add(btnCheckUpdates);
             this.Controls.Add(lblUpdateStatus);
+            this.Controls.Add(btnAbout);
 
             // Правая колонка
             this.Controls.Add(grpProxy);
@@ -413,7 +489,7 @@ namespace MaxLight
             this.Controls.Add(txtDownloadPath);
             this.Controls.Add(btnBrowseDownloadPath);
             this.Controls.Add(btnResetDownloadPath);
-            this.Controls.Add(btnAbout);
+            this.Controls.Add(chkAskEveryTime);
             this.Controls.Add(btnClose);
         }
 
@@ -422,6 +498,7 @@ namespace MaxLight
         {
             string path = ConfigManager.GetDownloadPath();
             txtDownloadPath.Text = path;
+            chkAskEveryTime.Checked = ConfigManager.AskEveryTime();
         }
 
         private void BrowseDownloadPath_Click(object sender, EventArgs e)

@@ -201,6 +201,12 @@ namespace MaxLight
             {
                 await UpdateDownloadFolderPath();
             };
+            // Подписка на изменение настройки "спрашивать каждый раз"
+            settingsForm.AskEveryTimeToggled += () =>
+            {
+                // Настройка уже сохранена в ConfigManager.SaveAskEveryTime()
+                System.Diagnostics.Debug.WriteLine($"🔔 Настройка 'спрашивать каждый раз' изменена: {ConfigManager.AskEveryTime()}");
+            };
             //  подписываемся на событие проверки обновлений 
             settingsForm.CheckUpdatesClicked += OnCheckUpdatesClickedAsync;
 

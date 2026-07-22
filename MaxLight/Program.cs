@@ -25,6 +25,7 @@ namespace MaxLight
         [STAThread]
         static void Main()
         {
+            
             try
             {
                 bool isPortable = IsPortableMode();
@@ -42,6 +43,8 @@ namespace MaxLight
                         return;
                     }
                 }
+
+
 
                 VelopackApp.Build().Run();
 

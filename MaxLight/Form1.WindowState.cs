@@ -21,7 +21,7 @@ namespace MaxLight
 
             // Таймер для дополнительной проверки
             _stateCheckTimer = new Timer();
-            _stateCheckTimer.Interval = 1000;
+            _stateCheckTimer.Interval = 3000; // было 1000
             _stateCheckTimer.Tick += OnStateCheckTimer;
             _stateCheckTimer.Start();
 
@@ -147,16 +147,16 @@ namespace MaxLight
             try
             {
                 string script = $@"
-                    try {{
-                        if (typeof updateWindowActiveState === 'function') {{
-                            updateWindowActiveState({isActive.ToString().ToLower()});
-                        }} else {{
-                            console.log('⚠️ Функция updateWindowActiveState не найдена');
-                        }}
-                    }} catch(e) {{
-                        console.log('❌ Ошибка обновления состояния:', e);
-                    }}
-                ";
+            try {{
+                if (typeof updateWindowActiveState === 'function') {{
+                    updateWindowActiveState({isActive.ToString().ToLower()});
+                }} else {{
+                    console.log('⚠️ Функция updateWindowActiveState не найдена');
+                }}
+            }} catch(e) {{
+                console.log('❌ Ошибка обновления состояния:', e);
+            }}
+        ";
 
                 await webView.CoreWebView2.ExecuteScriptAsync(script);
             }

@@ -339,8 +339,8 @@
 
         var contentContainer = document.querySelector('.content.svelte-1u8ha7t');
         if (!contentContainer) {
-            console.log('⚠️ Контейнер не найден, повторная попытка через 1 секунду');
-            setTimeout(setupObserver, 1000);
+            console.log('⚠️ Контейнер не найден, повторная попытка через 2 секунды');
+            setTimeout(setupObserver, 2000);
             return;
         }
 
@@ -425,11 +425,11 @@
             }
             return false;
         }
-
-        setTimeout(checkForIncomingCall, 1000);
-        setTimeout(checkForIncomingCall, 3000);
-        setTimeout(checkForIncomingCall, 5000);
-        setInterval(checkForIncomingCall, 1000);
+        // Оптимизация процессорного времени при мониторинге входящих звонков 
+        //setTimeout(checkForIncomingCall, 1000);
+       // setTimeout(checkForIncomingCall, 3000);
+        //setTimeout(checkForIncomingCall, 5000);
+        setInterval(checkForIncomingCall, 3000); //увеличено с 1000
 
         var observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
@@ -477,7 +477,7 @@
                 initCache();
                 setupObserver();
                 startPeriodicScan();
-                setInterval(cleanOldMessages, 60000);
+                setInterval(cleanOldMessages, 60000); //Очистка кэша
                 console.log('=== Парсер запущен ===');
                 console.log('📌 Текущее состояние окна: ' + (isWindowActive ? 'Активно' : 'Неактивно'));
             }

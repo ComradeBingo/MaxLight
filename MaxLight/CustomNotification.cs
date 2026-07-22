@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
+using System.Linq;
 using System.Net;
+using System.Windows.Forms;
 
 namespace MaxLight
 {
@@ -136,6 +137,23 @@ namespace MaxLight
             {
                 autoCloseTimer?.Stop();
                 autoCloseTimer?.Dispose();
+                // === НОВАЯ ЧАСТЬ: СБРОС СЧЕТЧИКА ===
+                try
+                {
+                    // Ищем главное окно приложения (Form1)
+                    var mainForm = Application.OpenForms.OfType<Form1>().FirstOrDefault();
+
+                    if (mainForm != null)
+                    {
+                        // Вызываем метод сброса счетчика, который есть в Form1.Tray.cs
+                        mainForm.ResetUnreadCount();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Ошибка сброса счетчика: {ex.Message}");
+                }
+                // ===================================
                 this.Close();
             };
 

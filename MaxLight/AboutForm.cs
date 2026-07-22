@@ -18,29 +18,107 @@ namespace MaxLight
         private LinkLabel lblGitHub;
         private Button btnOk;
         private PictureBox picIcon;
+        private Label lblInfoText; 
+
+        // ===== DPI МАСШТАБИРОВАНИЕ =====
+        private float _currentScale = 1.0f;
+        private const int BASE_WIDTH = 750;
+        private const int BASE_HEIGHT = 520;
 
         public AboutForm()
         {
+            // ===== ВКЛЮЧАЕМ ПОДДЕРЖКУ DPI =====
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+            this.DpiChanged += AboutForm_DpiChanged;
+
             InitializeForm();
             SetupModernStyle();
         }
 
+        // ===== ОБРАБОТЧИК ИЗМЕНЕНИЯ DPI =====
+        private void AboutForm_DpiChanged(object sender, DpiChangedEventArgs e)
+        {
+            _currentScale = e.DeviceDpiNew / 96f;
+            UpdateScale(_currentScale);
+        }
+
+        private void UpdateScale(float scale)
+        {
+            // Обновляем размер формы
+            int newWidth = (int)(BASE_WIDTH * scale);
+            int newHeight = (int)(BASE_HEIGHT * scale);
+            this.Size = new Size(newWidth, newHeight);
+            this.MinimumSize = new Size(newWidth, newHeight);
+            this.MaximumSize = new Size(newWidth, newHeight);
+
+            // Обновляем шрифты
+            this.Font = new Font("Segoe UI", 9f * scale, FontStyle.Regular, GraphicsUnit.Point);
+
+            // Пересчитываем позиции элементов
+            RecalculateLayout(scale);
+        }
+
+        private void RecalculateLayout(float scale)
+        {
+            int leftColumnX = (int)(40 * scale);
+            int rightColumnX = (int)(390 * scale);
+            int rowY = (int)(100 * scale);
+
+            // Обновляем позиции элементов
+            lblDescription.Location = new Point(leftColumnX, rowY);
+            lblDescription.Font = new Font("Segoe UI", 11f * scale);
+
+            rowY += (int)(35 * scale);
+            lblSecurityInfo.Location = new Point(leftColumnX, rowY);
+            lblSecurityInfo.Size = new Size((int)(350 * scale), (int)(270 * scale));
+            lblSecurityInfo.Font = new Font("Segoe UI", 10f * scale);
+
+            // Иконка
+            int iconSize = (int)(64 * scale);
+            picIcon.Size = new Size(iconSize, iconSize);
+            picIcon.Location = new Point(rightColumnX + (int)(105 * scale), (int)(115 * scale));
+
+            // Правая колонка (нижняя часть)
+            int rightRowY = (int)(210 * scale);
+            lblInfoText.Location = new Point(rightColumnX + (int)(90 * scale), rightRowY);
+            lblInfoText.Font = new Font("Segoe UI", 10f * scale);
+
+            rightRowY += (int)(45 * scale);
+            int githubWidth = (int)(180 * scale);
+            int githubHeight = (int)(35 * scale);
+            lblGitHub.Size = new Size(githubWidth, githubHeight);
+            lblGitHub.Location = new Point(rightColumnX + (int)(50 * scale), rightRowY);
+            lblGitHub.Font = new Font("Segoe UI", 10f * scale, FontStyle.Bold);
+
+            // Кнопка закрытия
+            int btnWidth = (int)(120 * scale);
+            int btnHeight = (int)(38 * scale);
+            btnOk.Size = new Size(btnWidth, btnHeight);
+            btnOk.Location = new Point((this.ClientSize.Width - btnWidth) / 2, (int)(465 * scale));
+            btnOk.Font = new Font("Segoe UI", 11f * scale, FontStyle.Bold);
+        }
+
         private void InitializeForm()
         {
+            // ===== НАСТРОЙКА DPI =====
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+
             this.Text = "О программе";
-            this.Size = new Size(750, 520);
+            this.Size = new Size(BASE_WIDTH, BASE_HEIGHT);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.None;
             this.BackColor = Color.White;
-            this.MinimumSize = new Size(750, 520);
-            this.MaximumSize = new Size(750, 520);
+            this.MinimumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
+            this.MaximumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
 
             // Верхняя панель
             headerPanel = new Panel
             {
-                BackColor = Color.FromArgb(66, 75, 121), //цвет верхней панели
+                BackColor = Color.FromArgb(66, 75, 121),
                 Height = 48,
                 Dock = DockStyle.Top
             };
@@ -86,7 +164,7 @@ namespace MaxLight
             // Информация о безопасности (левая колонка)
             lblSecurityInfo = new Label
             {
-                Text = 
+                Text =
                        "• PIN-код (DPAPI шифрование)\n" +
                        "• Блокировка 8+ типов трекеров\n" +
                        "• Зашифрованное хранилище (AES-256)\n" +
@@ -95,7 +173,7 @@ namespace MaxLight
                        "• Уведомления в трее и панели задач\n" +
                        "• Лёгкие и быстрые дельта-обновления\n" +
                        "• Поддержка работы с прокси\n" +
-                       "• Разные режимы работы для обычной и portable версий\n" ,
+                       "• Разные режимы работы для обычной и portable версий",
                 Font = new Font("Segoe UI", 10),
                 ForeColor = Color.FromArgb(80, 80, 80),
                 Location = new Point(leftColumnX, rowY),
@@ -105,9 +183,9 @@ namespace MaxLight
             // ===== ИКОНКА (ПРАВАЯ КОЛОНКА) =====
             picIcon = new PictureBox
             {
-                Size = new Size(64, 64), // Размер иконки 64x64
+                Size = new Size(64, 64),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(rightColumnX + 105, 115), // Центрируем
+                Location = new Point(rightColumnX + 105, 115),
                 BackColor = Color.Transparent
             };
 
@@ -119,19 +197,16 @@ namespace MaxLight
                 {
                     using (var icon = new Icon(iconPath))
                     {
-                        // Конвертируем Icon в Bitmap для PictureBox
                         picIcon.Image = icon.ToBitmap();
                     }
                 }
                 else
                 {
-                    // Если app.ico не найден, используем стандартную иконку приложения
                     picIcon.Image = Icon.ExtractAssociatedIcon(Application.ExecutablePath)?.ToBitmap();
                 }
             }
             catch
             {
-                // Если ошибка, используем стандартную иконку приложения
                 try
                 {
                     picIcon.Image = Icon.ExtractAssociatedIcon(Application.ExecutablePath)?.ToBitmap();
@@ -142,7 +217,7 @@ namespace MaxLight
             // ===== ПРАВАЯ КОЛОНКА (нижняя часть) =====
             int rightRowY = 210;
 
-            Label lblInfoText = new Label
+            lblInfoText = new Label // <-- ТЕПЕРЬ ЭТО ПОЛЕ КЛАССА
             {
                 Text = "© 2026 Max Light",
                 Font = new Font("Segoe UI", 10),
@@ -199,7 +274,7 @@ namespace MaxLight
             this.Controls.Add(lblDescription);
             this.Controls.Add(lblSecurityInfo);
             this.Controls.Add(picIcon);
-            this.Controls.Add(lblInfoText);
+            this.Controls.Add(lblInfoText); // <-- ТЕПЕРЬ КОРРЕКТНО
             this.Controls.Add(lblGitHub);
             this.Controls.Add(btnOk);
         }

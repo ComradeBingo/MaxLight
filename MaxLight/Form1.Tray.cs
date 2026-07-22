@@ -221,7 +221,7 @@ namespace MaxLight
         }
 
         // ===== СБРОС СЧЕТЧИКА =====
-        private void ResetUnreadCount()
+        public void ResetUnreadCount()
         {
             if (_unreadCount > 0)
             {
