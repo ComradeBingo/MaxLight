@@ -49,6 +49,9 @@ namespace MaxLight
 
             [JsonProperty("DownloadPath")]
             public string DownloadPath { get; set; }
+
+            [JsonProperty("AskEveryTime")]
+            public bool AskEveryTime { get; set; } = false;
         }
 
         public class AuthData
@@ -327,6 +330,20 @@ namespace MaxLight
             byte[] encryptedBytes = Convert.FromBase64String(encryptedBase64);
             byte[] decryptedBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decryptedBytes);
+        }
+
+        // ========== НАСТРОЙКА "СПРАШИВАТЬ КАЖДЫЙ РАЗ" ==========
+        public static void SaveAskEveryTime(bool askEveryTime)
+        {
+            var config = LoadConfig();
+            config.AskEveryTime = askEveryTime;
+            SaveConfig(config);
+        }
+
+        public static bool AskEveryTime()
+        {
+            var config = LoadConfig();
+            return config?.AskEveryTime ?? false;
         }
     }
 }

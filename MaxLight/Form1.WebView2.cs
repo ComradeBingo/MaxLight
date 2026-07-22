@@ -4,6 +4,8 @@ using Microsoft.Web.WebView2.WinForms;
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -133,6 +135,7 @@ namespace MaxLight
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
                 webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                 webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
+                webView.CoreWebView2.DownloadStarting += OnDownloadStarting;
 
                 loadingTimer = new Timer();
                 loadingTimer.Interval = 5000;
@@ -405,6 +408,70 @@ namespace MaxLight
             {
                 e.Response = webView.CoreWebView2.Environment.CreateWebResourceResponse(null, 204, "No Content", null);
             }
+        }
+
+        // ===== ОБРАБОТЧИК СКАЧИВАНИЯ ФАЙЛОВ =====
+        private void OnDownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
+        {
+            try
+            {
+                // Проверяем настройки "спрашивать каждый раз"
+                bool askEveryTime = ConfigManager.AskEveryTime();
+                
+                if (askEveryTime)
+                {
+                    System.Diagnostics.Debug.WriteLine("📥 [MaxLight] Событие DownloadStarting сработало, askEveryTime=true");
+                    
+                    // Отменяем стандартное отображение диалога WebView2
+                    e.Handled = true;
+                    
+                    // Получаем операцию загрузки
+                    CoreWebView2DownloadOperation download = e.DownloadOperation;
+                    
+                    // Получаем имя файла из пути результата
+                    string suggestedFileName = Path.GetFileName(download.ResultFilePath);
+                    System.Diagnostics.Debug.WriteLine($"📥 [MaxLight] Имя файла из ResultFilePath: {suggestedFileName}");
+                    
+                    // Вызываем собственный диалог сохранения файла
+                    using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+                    {
+                        saveFileDialog.Title = "Сохранить файл";
+                        saveFileDialog.FileName = suggestedFileName;
+                        saveFileDialog.InitialDirectory = Path.GetDirectoryName(download.ResultFilePath);
+                        saveFileDialog.RestoreDirectory = true;
+                        saveFileDialog.Filter = GetFileFilter();
+                        
+                        System.Diagnostics.Debug.WriteLine($"📥 [MaxLight] Показываем диалог сохранения...");
+                        
+                        if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"📥 [MaxLight] Пользователь выбрал путь: {saveFileDialog.FileName}");
+                            // Переопределяем путь для сохранения
+                            e.ResultFilePath = saveFileDialog.FileName;
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("🚫 [MaxLight] Скачивание отменено пользователем");
+                            // Пользователь нажал "Отмена" - отменяем скачивание
+                            e.Cancel = true;
+                        }
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("⚠️ [MaxLight] askEveryTime=false, пропускаем обработку скачивания");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("❌ [MaxLight] Ошибка при обработке скачивания: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine($"❌ [MaxLight] Stack: {ex.StackTrace}");
+            }
+        }
+
+        private string GetFileFilter()
+        {
+            return "Все файлы (*.*)|*.*|PDF файлы (*.pdf)|*.pdf|Изображения (*.jpg;*.jpeg;*.png;*.gif)|*.jpg;*.jpeg;*.png;*.gif|Видео (*.mp4;*.avi;*.mkv)|*.mp4;*.avi;*.mkv";
         }
     }
 }
