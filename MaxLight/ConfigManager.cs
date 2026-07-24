@@ -2,6 +2,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 using Microsoft.Win32;
 using System.Windows.Forms;
@@ -11,6 +12,23 @@ namespace MaxLight
     public class ConfigManager
     {
         private static readonly object _lock = new object();
+
+        // Межпроцессная блокировка: при обновлении Velopack старый и новый процессы
+        // могут обращаться к config.json одновременно
+        private static readonly Mutex _crossProcessLock = new Mutex(false, "MaxLight_ConfigFileMutex");
+
+        private static bool AcquireFileLock()
+        {
+            try
+            {
+                return _crossProcessLock.WaitOne(TimeSpan.FromSeconds(5));
+            }
+            catch (AbandonedMutexException)
+            {
+                // Прежний процесс был убит, не освободив мьютекс — блокировка теперь наша
+                return true;
+            }
+        }
 
         // ========== ПРАВИЛЬНЫЙ ПУТЬ К CONFIG.JSON ==========
         private static string GetConfigPath()
@@ -103,22 +121,62 @@ namespace MaxLight
         {
             lock (_lock)
             {
-                string configPath = GetConfigPath();
-
-                if (!File.Exists(configPath))
-                {
-                    return new ConfigData();
-                }
-
+                bool locked = AcquireFileLock();
                 try
                 {
-                    string json = File.ReadAllText(configPath);
-                    return JsonConvert.DeserializeObject<ConfigData>(json) ?? new ConfigData();
+                    return LoadConfigCore();
                 }
-                catch
+                finally
                 {
-                    return new ConfigData();
+                    if (locked) _crossProcessLock.ReleaseMutex();
                 }
+            }
+        }
+
+        private static ConfigData LoadConfigCore()
+        {
+            string configPath = GetConfigPath();
+            string backupPath = configPath + ".bak";
+
+            if (!File.Exists(configPath))
+            {
+                // Свежая установка — либо сбой между шагами File.Replace: пробуем бэкап
+                return TryReadFile(backupPath) ?? new ConfigData();
+            }
+
+            var config = TryReadFile(configPath);
+            if (config != null) return config;
+
+            // Файл битый: сохраняем копию для диагностики, пробуем восстановиться из бэкапа
+            try
+            {
+                File.Copy(configPath, configPath + ".corrupt-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), true);
+            }
+            catch { }
+
+            config = TryReadFile(backupPath);
+            if (config != null)
+            {
+                System.Diagnostics.Debug.WriteLine("♻️ config.json битый, восстановлен из .bak");
+                try { SaveConfigCore(config); } catch { }
+                return config;
+            }
+
+            System.Diagnostics.Debug.WriteLine("⚠️ config.json битый, бэкапа нет — создан новый");
+            return new ConfigData();
+        }
+
+        private static ConfigData TryReadFile(string path)
+        {
+            if (!File.Exists(path)) return null;
+            try
+            {
+                string json = File.ReadAllText(path);
+                return JsonConvert.DeserializeObject<ConfigData>(json);
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -126,17 +184,48 @@ namespace MaxLight
         {
             lock (_lock)
             {
+                bool locked = AcquireFileLock();
                 try
                 {
-                    string configPath = GetConfigPath();
-                    string json = JsonConvert.SerializeObject(config, Formatting.Indented);
-                    File.WriteAllText(configPath, json);
-                    System.Diagnostics.Debug.WriteLine($"💾 Config сохранен: {configPath}");
+                    SaveConfigCore(config);
+                    System.Diagnostics.Debug.WriteLine($"💾 Config сохранен: {GetConfigPath()}");
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"❌ Ошибка сохранения config.json: {ex.Message}");
                 }
+                finally
+                {
+                    if (locked) _crossProcessLock.ReleaseMutex();
+                }
+            }
+        }
+
+        private static void SaveConfigCore(ConfigData config)
+        {
+            string configPath = GetConfigPath();
+            string tempPath = configPath + ".tmp";
+            string backupPath = configPath + ".bak";
+            string json = JsonConvert.SerializeObject(config, Formatting.Indented);
+
+            // Пишем во временный файл и сбрасываем на диск ДО подмены основного:
+            // прерванная запись портит только .tmp, а config.json остаётся целым
+            using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(fs, new UTF8Encoding(false)))
+            {
+                writer.Write(json);
+                writer.Flush();
+                fs.Flush(true);
+            }
+
+            if (File.Exists(configPath))
+            {
+                // Атомарная подмена: читатель видит либо старый, либо новый файл целиком
+                File.Replace(tempPath, configPath, backupPath, true);
+            }
+            else
+            {
+                File.Move(tempPath, configPath);
             }
         }
 
