@@ -81,8 +81,9 @@ namespace MaxLight
             this.FormBorderStyle = FormBorderStyle.None;
             this.FormClosing += Form1_FormClosing;
             this.Resize += Form1_Resize;
+            // ResizeEnd (WM_EXITSIZEMOVE) срабатывает и в конце перетаскивания окна,
+            // отдельный Move не нужен — он писал config.json десятки раз в секунду
             this.ResizeEnd += (s, e) => SaveWindowState();
-            this.Move += (s, e) => SaveWindowState();
             Application.ApplicationExit += (s, e) => SaveWindowState();
 
             SetupWindowStateTracking();
