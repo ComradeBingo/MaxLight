@@ -14,9 +14,6 @@ namespace MaxLight
 {
     public partial class Form1 : Form
     {
-
-        
-
         // ========== ПОЛЯ ==========
         private WebView2 webView;
         private TitleBar titleBar;
@@ -34,9 +31,9 @@ namespace MaxLight
 
         private Timer notificationFlashTimer;
         private bool isAttentionRequired = false;
-        private const int ATTENTION_TIMEOUT_MS = 5000; //если юзер не кликнул пуш, то через сколько мс будет мигать иконка в панели задач
-        private PageModifier _pageModifier; //Код модификаторов для WebView2
-        private string _pendingDownloadPath; //путь загрузки файлов
+        private const int ATTENTION_TIMEOUT_MS = 5000;
+        private PageModifier _pageModifier;
+        private string _pendingDownloadPath;
 
         private int _unreadCount = 0;
         private Icon _normalIcon;
@@ -52,11 +49,16 @@ namespace MaxLight
 
         private Screen _currentScreen;
 
-        private readonly string[] _trackingKeywords = new[] //блокируем к черту трекеры
+        private readonly string[] _trackingKeywords = new[]
         {
             "analytics", "apptracer", "perf/", "sdk-api",
             "adsystem", "crashtoken", "crash", "track"
         };
+
+        // ===== DPI МАСШТАБИРОВАНИЕ =====
+        private float _currentScale = 1.0f;
+        private const int BASE_WIDTH = 1050;
+        private const int BASE_HEIGHT = 800;
 
         // ========== КОНСТРУКТОР ==========
         public Form1() : this(null) { }
@@ -66,9 +68,20 @@ namespace MaxLight
             _activateEvent = activateEvent;
             _isPortable = IsPortableMode();
 
+            // ===== ВКЛЮЧАЕМ ПОДДЕРЖКУ DPI =====
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+            this.DpiChanged += Form1_DpiChanged;
+
             if (!CheckPinOnStartup()) Environment.Exit(0);
 
             InitializeForm();
+
+            // Применить масштаб для стартового DPI
+            float initialScale = this.DeviceDpi / 96f;
+            if (Math.Abs(initialScale - 1f) > 0.01f)
+                ApplyDpiScale(initialScale);
+
             LoadWindowState();
             CreateTrayIcon();
             LoadIcons();
@@ -109,41 +122,84 @@ namespace MaxLight
             }
         }
 
+        // ===== ОБРАБОТЧИК ИЗМЕНЕНИЯ DPI =====
+        private void Form1_DpiChanged(object sender, DpiChangedEventArgs e)
+        {
+            _currentScale = e.DeviceDpiNew / 96f;
+            ApplyDpiScale(_currentScale);
+        }
 
-        // ==========  Событие клика по уведомлению ==========
+        private void ApplyDpiScale(float scale)
+        {
+            _currentScale = scale;
+
+            // Снять ограничения перед ресайзом
+            this.MinimumSize = Size.Empty;
+            this.MaximumSize = Size.Empty;
+
+            // Обновляем размер формы
+            int newWidth = (int)(BASE_WIDTH * scale);
+            int newHeight = (int)(BASE_HEIGHT * scale);
+            this.Size = new Size(newWidth, newHeight);
+
+            // Устанавливаем новые ограничения
+            var screen = Screen.FromControl(this).Bounds;
+            this.MinimumSize = new Size((int)(640 * scale), (int)(480 * scale));
+            this.MaximumSize = new Size(screen.Width, screen.Height);
+
+            // Обновляем шрифты
+            this.Font = new Font("Segoe UI", 9f * scale, FontStyle.Regular, GraphicsUnit.Point);
+
+            // Обновляем размер WebView если он есть
+            if (webView != null)
+            {
+                UpdateWebViewSize();
+            }
+        }
+
+        private void UpdateWebViewSize()
+        {
+            if (webView == null) return;
+
+            int titleBarHeight = titleBar?.Height ?? (int)(40 * _currentScale);
+            int borderSize = (int)(2 * _currentScale);
+
+            webView.Location = new Point(borderSize, titleBarHeight + borderSize);
+            webView.Size = new Size(
+                this.ClientSize.Width - (borderSize * 2),
+                this.ClientSize.Height - titleBarHeight - (borderSize * 2)
+            );
+        }
+
+        // ========== Событие клика по уведомлению ==========
         public event EventHandler UpdateNotificationClicked;
 
-        // ==========  Показать уведомление в TitleBar ==========
+        // ========== Показать уведомление в TitleBar ==========
         public void ShowUpdateNotification(string version)
         {
             if (titleBar != null)
             {
-                // Подписываемся на клик по уведомлению
-                titleBar.UpdateNotificationClick -= OnTitleBarUpdateClick; // Отписываемся, чтобы избежать дублей
+                titleBar.UpdateNotificationClick -= OnTitleBarUpdateClick;
                 titleBar.UpdateNotificationClick += OnTitleBarUpdateClick;
-
-                // Показываем уведомление
                 titleBar.ShowUpdateNotification(version);
             }
         }
 
-        // ==========  Скрыть уведомление ==========
+        // ========== Скрыть уведомление ==========
         public void HideUpdateNotification()
         {
             titleBar?.HideUpdateNotification();
         }
 
-        // ==========  Обработчик клика по уведомлению в TitleBar ==========
+        // ========== Обработчик клика по уведомлению в TitleBar ==========
         private void OnTitleBarUpdateClick(object sender, EventArgs e)
         {
             UpdateNotificationClicked?.Invoke(this, EventArgs.Empty);
         }
 
-        // ==========  Проверка, есть ли обновление ==========
+        // ========== Проверка, есть ли обновление ==========
         public bool HasUpdate => titleBar?.HasUpdate ?? false;
         public string UpdateVersion => titleBar?.UpdateVersion ?? "";
-
-
 
         // ========== ОСНОВНЫЕ МЕТОДЫ ==========
 
@@ -156,8 +212,8 @@ namespace MaxLight
             this.UpdateStyles();
 
             var screen = Screen.PrimaryScreen.Bounds;
-            this.Size = new Size(1050, 800);
-            this.BackColor = Color.FromArgb(66, 75, 121); //цвет рамки окна
+            this.Size = new Size(BASE_WIDTH, BASE_HEIGHT);
+            this.BackColor = Color.FromArgb(66, 75, 121);
             this.MinimumSize = new Size(640, 480);
             this.MaximumSize = new Size(screen.Width, screen.Height);
             this.ShowInTaskbar = true;
@@ -196,38 +252,30 @@ namespace MaxLight
                 Application.Restart();
                 Environment.Exit(0);
             };
-            // Подписка на изменение папки загрузок
             settingsForm.DownloadPathChanged += async (path) =>
             {
                 await UpdateDownloadFolderPath();
             };
-            // Подписка на изменение настройки "спрашивать каждый раз"
             settingsForm.AskEveryTimeToggled += () =>
             {
-                // Настройка уже сохранена в ConfigManager.SaveAskEveryTime()
                 System.Diagnostics.Debug.WriteLine($"🔔 Настройка 'спрашивать каждый раз' изменена: {ConfigManager.AskEveryTime()}");
             };
-            //  подписываемся на событие проверки обновлений 
             settingsForm.CheckUpdatesClicked += OnCheckUpdatesClickedAsync;
 
             settingsForm.ShowDialog(this);
         }
 
-        // НОВЫЙ МЕТОД: возвращает bool (найдено обновление или нет) 
         private async Task<bool> OnCheckUpdatesClickedAsync()
         {
             try
             {
-                // Запускаем проверку
                 await Program.ForceCheckUpdatesAsync();
-
-                // Возвращаем результат
                 return titleBar.HasUpdate;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"❌ Ошибка проверки обновлений: {ex.Message}");
-                throw; // Пробрасываем для отображения в SettingsForm
+                throw;
             }
         }
 
@@ -320,8 +368,6 @@ namespace MaxLight
                     key.DeleteValue("MaxLight", false);
             }
         }
-
-        // ========== ВСПОМОГАТЕЛЬНЫЙ ==========
 
         private string GetEmbeddedResource(string resourceName)
         {

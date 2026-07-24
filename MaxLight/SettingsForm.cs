@@ -1,46 +1,55 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using Microsoft.Win32;
-using System.Linq;
 using System.Threading.Tasks;
-using System.IO;
 
 namespace MaxLight
 {
     public class SettingsForm : Form
     {
+        // Шапка
         private Panel headerPanel;
         private Label lblTitle;
+
+        // Левая колонка - Общие
+        private GroupBox grpGeneral;
         private CheckBox chkAutoStart;
         private CheckBox chkNotificationsOnTop;
+
+        // Левая колонка - Безопасность
+        private GroupBox grpSecurity;
         private Button btnPinSettings;
         private Button btnLogout;
-        private Button btnAbout;
         private Button btnCheckUpdates;
+        private Button btnAbout;
         private Label lblUpdateStatus;
-        private Button btnClose;
 
-        // Элементы прокси
+        // Правая колонка - Прокси
         private GroupBox grpProxy;
         private CheckBox chkProxyEnabled;
-        private Label lblProxyServer;
         private TextBox txtProxyServer;
-        private Label lblProxyPort;
         private NumericUpDown numProxyPort;
         private Button btnApplyProxy;
 
-        // Элементы папки загрузок
-        private Label lblDownloadPath;
+        // Правая колонка - Загрузки
+        private GroupBox grpDownloads;
         private TextBox txtDownloadPath;
-        private CheckBox chkAskEveryTime;
         private Button btnBrowseDownloadPath;
         private Button btnResetDownloadPath;
+        private CheckBox chkAskEveryTime;
+
+        // Нижняя панель
+        private Panel bottomPanel;
+        private Button btnClose;
+
+        // Контейнер с прокруткой
+        private Panel scrollContainer;
+        private TableLayoutPanel mainTable;
+
         public event Action<string> DownloadPathChanged;
-
         public event Action AskEveryTimeToggled;
-
-        // События для связи с Form1
         public event Action AutoStartToggled;
         public event Action<bool> NotificationsOnTopToggled;
         public event Action PinSettingsClicked;
@@ -50,799 +59,780 @@ namespace MaxLight
         public event Func<Task<bool>> CheckUpdatesClicked;
 
         private bool _isPortable;
-        private ConfigManager.ProxySettings _originalProxySettings;
         private bool _isChecking = false;
-
-        // ===== DPI МАСШТАБИРОВАНИЕ =====
-        private float _currentScale = 1.0f;
-        private const int BASE_WIDTH = 750;
-        private const int BASE_HEIGHT = 520;
 
         public SettingsForm(bool isPortable = false)
         {
             _isPortable = isPortable;
 
-            // ===== ВКЛЮЧАЕМ ПОДДЕРЖКУ DPI =====
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.AutoScaleDimensions = new SizeF(96F, 96F);
-            this.DpiChanged += SettingsForm_DpiChanged;
+            this.AutoScroll = true;
+
+            
+
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.BackColor = Color.FromArgb(245, 246, 250);
+            this.ShowIcon = false;
+            this.ShowInTaskbar = false;
 
             InitializeForm();
-
-            LoadAutoStartState();
-            LoadNotificationsOnTopState();
-            LoadProxySettings();
-            LoadDownloadPath();
+            LoadSettings();
 
             if (_isPortable)
             {
                 chkAutoStart.Enabled = false;
                 chkAutoStart.Checked = false;
-                chkAutoStart.Text = "Автоматический запуск\nнедоступен в portable-версии";
-                chkAutoStart.ForeColor = Color.Gray;
+                chkAutoStart.Text = "Автозапуск (недоступен)";
             }
         }
 
-        // ===== ОБРАБОТЧИК ИЗМЕНЕНИЯ DPI =====
-        private void SettingsForm_DpiChanged(object sender, DpiChangedEventArgs e)
+        private float _currentScale = 1f;
+
+        protected override void OnHandleCreated(EventArgs e)
         {
-            _currentScale = e.DeviceDpiNew / 96f;
-            UpdateScale(_currentScale);
+            base.OnHandleCreated(e);
+
+            // Получаем размер экрана
+            var screenBounds = Screen.PrimaryScreen.Bounds;
+            float screenWidth = screenBounds.Width;
+
+            // Определяем коэффициент масштабирования для элементов
+            float elementScale = 1f;
+            int windowWidth;
+            int windowHeight;
+
+            if (screenWidth >= 3840) // 4K
+            {
+                windowWidth = LogicalToDeviceUnits(1800);
+                windowHeight = LogicalToDeviceUnits(1100);
+                elementScale = 1.0f;
+            }
+            else if (screenWidth >= 2560) // 1440p
+            {
+                windowWidth = LogicalToDeviceUnits(1400);
+                windowHeight = LogicalToDeviceUnits(850);
+                elementScale = 0.85f;
+            }
+            else // 1080p и меньше
+            {
+                windowWidth = LogicalToDeviceUnits(1000);  
+                windowHeight = LogicalToDeviceUnits(750);  
+                elementScale = 0.7f;  // Уменьшаем элементы на 20%
+            }
+
+            this.MinimumSize = new Size(windowWidth, windowHeight);
+            this.ClientSize = new Size(
+                (int)(windowWidth * 1.15f),
+                (int)(windowHeight * 1.1f)
+            );
+
+            // Применяем масштабирование к элементам
+            if (elementScale < 1f)
+            {
+                ScaleElementSizes(elementScale);
+            }
         }
 
-        private void UpdateScale(float scale)
+        private void ScaleElementSizes(float scale)
         {
-            // Обновляем размер формы
-            int newWidth = (int)(BASE_WIDTH * scale);
-            int newHeight = (int)(BASE_HEIGHT * scale);
-            this.Size = new Size(newWidth, newHeight);
-            this.MinimumSize = new Size(newWidth, newHeight);
-            this.MaximumSize = new Size(newWidth, newHeight);
+            // ❌ НЕ ТРОГАЕМ ШРИФТЫ - оставляем как есть
 
-            // Обновляем шрифты
-            this.Font = new Font("Segoe UI", 9f * scale, FontStyle.Regular, GraphicsUnit.Point);
+            // 1. Уменьшаем MinimumSize для CheckBox
+            int checkBoxMinWidth = (int)(550 * scale);
+            if (checkBoxMinWidth < 380) checkBoxMinWidth = 380;
 
-            // Пересчитываем позиции элементов
-            RecalculateLayout(scale);
-        }
+            chkAutoStart.MinimumSize = new Size(checkBoxMinWidth, 30);
+            chkNotificationsOnTop.MinimumSize = new Size(checkBoxMinWidth, 30);
+            chkProxyEnabled.MinimumSize = new Size((int)(400 * scale), 30);
+            chkAskEveryTime.MinimumSize = new Size((int)(400 * scale), 30);
 
-        private void RecalculateLayout(float scale)
-        {
-            int leftColumnX = (int)(30 * scale);
-            int rightColumnX = (int)(390 * scale);
-            int rowY = (int)(100 * scale);
-            int rowSpacing = (int)(35 * scale);
-            int buttonWidth = (int)(220 * scale);
-            int buttonHeight = (int)(35 * scale);
+            // 2. Уменьшаем отступы в GroupBox
+            int pad = (int)(15 * scale);
+            if (pad < 8) pad = 8;
 
-            // Обновляем позиции элементов (пример для левой колонки)
-            chkAutoStart.Location = new Point(leftColumnX + (int)(30 * scale), rowY);
-            chkAutoStart.Font = new Font("Segoe UI", 10f * scale);
+            grpGeneral.Padding = new Padding(pad, (int)(35 * scale), pad, (int)(15 * scale));
+            grpSecurity.Padding = new Padding(pad, (int)(35 * scale), pad, (int)(15 * scale));
+            grpProxy.Padding = new Padding(pad, (int)(35 * scale), pad, (int)(15 * scale));
+            grpDownloads.Padding = new Padding(pad, (int)(35 * scale), pad, (int)(15 * scale));
 
-            rowY += (int)(28 * scale);
-            chkNotificationsOnTop.Location = new Point(leftColumnX + (int)(30 * scale), rowY += rowSpacing);
-            chkNotificationsOnTop.Font = new Font("Segoe UI", 10f * scale);
+            // 3. Уменьшаем отступы в FlowLayoutPanel
+            int flowPad = (int)(10 * scale);
+            if (flowPad < 5) flowPad = 5;
 
-            
+            foreach (Control ctrl in grpGeneral.Controls)
+            {
+                if (ctrl is FlowLayoutPanel flow)
+                {
+                    flow.Padding = new Padding(flowPad, flowPad, flowPad, flowPad);
+                }
+            }
+
+            // 4. Уменьшаем кнопки (Padding)
+            int btnPad = (int)(15 * scale);
+            if (btnPad < 8) btnPad = 8;
+
+            btnPinSettings.Padding = new Padding(btnPad, (int)(10 * scale), btnPad, (int)(10 * scale));
+            btnLogout.Padding = new Padding(btnPad, (int)(10 * scale), btnPad, (int)(10 * scale));
+            btnCheckUpdates.Padding = new Padding(btnPad, (int)(10 * scale), btnPad, (int)(10 * scale));
+            btnAbout.Padding = new Padding(btnPad, (int)(10 * scale), btnPad, (int)(10 * scale));
+
+            // 5. Уменьшаем кнопку "ЗАКРЫТЬ"
+            int closePad = (int)(40 * scale);
+            if (closePad < 25) closePad = 25;
+            btnClose.Padding = new Padding(closePad, (int)(12 * scale), closePad, (int)(12 * scale));
+
+            // 6. Уменьшаем кнопки в секции загрузок
+            int btnSmallPad = (int)(20 * scale);
+            if (btnSmallPad < 12) btnSmallPad = 12;
+
+            btnBrowseDownloadPath.Padding = new Padding(btnSmallPad, (int)(10 * scale), btnSmallPad, (int)(10 * scale));
+            btnResetDownloadPath.Padding = new Padding(btnSmallPad, (int)(10 * scale), btnSmallPad, (int)(10 * scale));
+            btnApplyProxy.Padding = new Padding(btnSmallPad, (int)(10 * scale), btnSmallPad, (int)(10 * scale));
+
+            // 7. Уменьшаем отступы между элементами
+            chkAutoStart.Margin = new Padding(0, 0, 0, (int)(15 * scale));
+            chkNotificationsOnTop.Margin = new Padding(0, (int)(10 * scale), 0, 0);
+            chkProxyEnabled.Margin = new Padding(0, 0, 0, (int)(10 * scale));
+
+            // 8. Уменьшаем высоту шапки
+            int headerHeight = (int)(55 * Math.Max(1, scale));
+            headerPanel.Height = headerHeight;
+            lblTitle.Location = new Point((int)(25 * scale), (headerHeight - lblTitle.Height) / 2);
         }
 
         private void InitializeForm()
         {
-            // ===== НАСТРОЙКА DPI =====
-            this.AutoScaleMode = AutoScaleMode.Dpi;
-            this.AutoScaleDimensions = new SizeF(96F, 96F);
-
-            this.Text = "Настройки Max Light";
-            this.Size = new Size(BASE_WIDTH, BASE_HEIGHT);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.BackColor = Color.White;
-            this.MinimumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
-            this.MaximumSize = new Size(BASE_WIDTH, BASE_HEIGHT);
-            this.ShowIcon = false;
-            this.ShowInTaskbar = false;
-
-            // Верхняя панель
+            // === ШАПКА ===
             headerPanel = new Panel
             {
+                Dock = DockStyle.Top,
                 BackColor = Color.FromArgb(66, 75, 121),
-                Height = 48,
-                Dock = DockStyle.Top
+                AutoSize = true,  
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,  
+                Padding = new Padding(30, 16, 30, 16)
             };
+
+            bool drag = false;
+            Point ds = Point.Empty;
+            headerPanel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) { drag = true; ds = e.Location; } };
+            headerPanel.MouseMove += (s, e) => { if (drag) this.Location = new Point(this.Location.X + e.X - ds.X, this.Location.Y + e.Y - ds.Y); };
+            headerPanel.MouseUp += (s, e) => drag = false;
 
             lblTitle = new Label
             {
-                Text = "Настройки",
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                Text = "Настройки Max Light",
+                Font = new Font("Segoe UI", 16, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(12, 12),
-                AutoSize = true
+                BackColor = Color.Transparent,
+                AutoSize = true,  
+                Dock = DockStyle.Fill,  
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            headerPanel.Controls.Add(lblTitle);
+            this.Controls.Add(headerPanel);
+
+            // === НИЖНЯЯ ПАНЕЛЬ ===
+            bottomPanel = new Panel
+            {
+                Height = 80,
+                Dock = DockStyle.Bottom,
+                BackColor = Color.White
             };
 
-            int leftColumnX = 30;
-            int rightColumnX = 390;
-            int rowY = 100;
-            int rowSpacing = 35;
+            btnClose = new Button
+            {
+                Text = "ЗАКРЫТЬ",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(50, 14, 50, 14),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(52, 152, 219),
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += (s, e) => Close();
+            bottomPanel.Controls.Add(btnClose);
 
-            // ===== Общие настройки =====
-            rowY += 5;
-            CreateSectionHeader("\uE713", "ОБЩИЕ", new Point(leftColumnX + 60, rowY));
+            bottomPanel.Resize += (s, e) =>
+            {
+                btnClose.Location = new Point(
+                    (bottomPanel.Width - btnClose.Width) / 2,
+                    (bottomPanel.Height - btnClose.Height) / 2
+                );
+            };
+            this.Controls.Add(bottomPanel);
 
-            // ===== АВТОЗАПУСК =====
+            // === КОНТЕЙНЕР С ПРОКРУТКОЙ ===
+            scrollContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.FromArgb(245, 246, 250)
+            };
+            this.Controls.Add(scrollContainer);
+
+            // === ГЛАВНАЯ ТАБЛИЦА ===
+            mainTable = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = new Padding(30, 40, 30, 30)
+            };
+            mainTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            mainTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            scrollContainer.Controls.Add(mainTable);
+
+            // Левая колонка
+            var leftColumn = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                RowCount = 2,
+                Margin = new Padding(0, 0, 20, 0)
+            };
+            leftColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            leftColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            CreateGeneralSection(leftColumn);
+            CreateSecuritySection(leftColumn);
+            mainTable.Controls.Add(leftColumn, 0, 0);
+
+            // Правая колонка
+            var rightColumn = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                RowCount = 2,
+                Margin = new Padding(20, 0, 0, 0)
+            };
+            rightColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            rightColumn.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            CreateProxySection(rightColumn);
+            CreateDownloadsSection(rightColumn);
+            mainTable.Controls.Add(rightColumn, 1, 0);
+        }
+
+        private void CreateGeneralSection(TableLayoutPanel parent)
+        {
+            grpGeneral = new GroupBox
+            {
+                Text = "ОБЩИЕ НАСТРОЙКИ",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 60, 0, 25),
+                Padding = new Padding(25, 45, 25, 30)
+            };
+
+            var flowLayout = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(15, 10, 15, 10)
+            };
+
             chkAutoStart = new CheckBox
             {
-                Text = "Автоматически запускать\nпри входе в Windows",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX + 30, rowY += rowSpacing),
+                Text = "Автоматически запускать при входе в Windows",
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                ForeColor = Color.FromArgb(44, 62, 80),
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 0, 25),
+                Padding = new Padding(10, 8, 10, 8),
+                UseVisualStyleBackColor = true,
+                MinimumSize = new Size(550, 35)
             };
             chkAutoStart.CheckedChanged += (s, e) => AutoStartToggled?.Invoke();
+            flowLayout.Controls.Add(chkAutoStart);
 
-            rowY += 28;
             chkNotificationsOnTop = new CheckBox
             {
-                Text = "Показывать уведомления\nповерх всех окон",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX + 30, rowY += rowSpacing),
+                Text = "Показывать уведомления поверх всех окон",
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                ForeColor = Color.FromArgb(44, 62, 80),
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 20, 0, 0),
+                Padding = new Padding(10, 8, 10, 8),
+                UseVisualStyleBackColor = true,
+                MinimumSize = new Size(550, 35)
             };
             chkNotificationsOnTop.CheckedChanged += (s, e) => NotificationsOnTopToggled?.Invoke(chkNotificationsOnTop.Checked);
+            flowLayout.Controls.Add(chkNotificationsOnTop);
 
-            // ===== БЕЗОПАСНОСТЬ =====
-            rowY += rowSpacing + 35;
-            CreateSectionHeader("\uE72E", "Безопасность и аккаунт", new Point(leftColumnX + 28, rowY));
+            grpGeneral.Controls.Add(flowLayout);
+            parent.Controls.Add(grpGeneral, 0, 0);
+        }
 
-            rowY += 28;
-            btnPinSettings = CreateStyledButton(
-                "\uE72E",
-                "Управление PIN-кодом",
-                Color.FromArgb(66, 75, 121),
-                new Size(220, 35),
-                new Point(leftColumnX + 20, rowY)
-            );
+        private void CreateSecuritySection(TableLayoutPanel parent)
+        {
+            grpSecurity = new GroupBox
+            {
+                Text = "БЕЗОПАСНОСТЬ И АККАУНТ",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 25, 0, 0),
+                Padding = new Padding(25, 45, 25, 30)
+            };
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 6,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink
+            };
+
+            for (int i = 0; i < 6; i++)
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            btnPinSettings = CreateButton("🔒 Управление PIN-кодом", Color.FromArgb(66, 75, 121));
             btnPinSettings.Click += (s, e) => PinSettingsClicked?.Invoke();
+            layout.Controls.Add(btnPinSettings, 0, 0);
 
-            rowY += 45;
-            btnLogout = CreateStyledButton(
-                "\uE711",
-                "Выйти из аккаунта",
-                Color.FromArgb(231, 76, 60),
-                new Size(220, 35),
-                new Point(leftColumnX + 20, rowY)
-            );
+            btnLogout = CreateButton("🚪 Выйти из аккаунта", Color.FromArgb(231, 76, 60));
             btnLogout.Click += (s, e) => LogoutClicked?.Invoke();
+            layout.Controls.Add(btnLogout, 0, 1);
 
-            // ===== ПРОВЕРКА ОБНОВЛЕНИЙ =====
-            rowY += 45;
-            btnCheckUpdates = CreateStyledButton(
-                "\uE896",
-                "Проверка обновлений",
-                Color.FromArgb(86, 86, 157),
-                new Size(220, 35),
-                new Point(leftColumnX + 20, rowY)
-            );
+            layout.Controls.Add(new Label { AutoSize = false, Height = 15 }, 0, 2);
+
+            btnCheckUpdates = CreateButton("🔄 Проверка обновлений", Color.FromArgb(86, 86, 157));
             btnCheckUpdates.Click += async (s, e) => await OnCheckUpdatesClicked();
+            layout.Controls.Add(btnCheckUpdates, 0, 3);
 
             lblUpdateStatus = new Label
             {
-                Text = "",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(leftColumnX + 30, rowY + 8),
-                Size = new Size(200, 35),
-                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = true,
+                Margin = new Padding(10, 10, 0, 10),
                 Visible = false,
-                BackColor = Color.Transparent
+                Padding = new Padding(8)
             };
+            layout.Controls.Add(lblUpdateStatus, 0, 4);
 
-            // ===== О ПРОГРАММЕ (в левой колонке) =====
-            rowY += 45;
-            btnAbout = CreateStyledButton(
-                "\uE946",
-                "О ПРОГРАММЕ",
-                Color.FromArgb(66, 75, 121),
-                new Size(220, 35),
-                new Point(leftColumnX + 20, rowY)
-            );
+            btnAbout = CreateButton("ℹ️ О программе", Color.FromArgb(66, 75, 121));
             btnAbout.Click += (s, e) => AboutClicked?.Invoke();
+            btnAbout.Margin = new Padding(0, 10, 0, 0);
+            layout.Controls.Add(btnAbout, 0, 5);
 
-            // ===== ПРАВАЯ КОЛОНКА =====
-            int rightRowY = 100;
+            grpSecurity.Controls.Add(layout);
+            parent.Controls.Add(grpSecurity, 0, 1);
+        }
 
-            // ===== ПРОКСИ =====
-            CreateSectionHeader("\uE774", "Настройки прокси", new Point(rightColumnX + 48, rightRowY));
-
-            rightRowY += 30;
+        private void CreateProxySection(TableLayoutPanel parent)
+        {
             grpProxy = new GroupBox
             {
-                Location = new Point(rightColumnX, rightRowY),
-                Size = new Size(320, 125),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White
+                Text = "НАСТРОЙКИ ПРОКСИ",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 60, 0, 25),
+                Padding = new Padding(25, 45, 25, 30)
             };
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 4,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(15, 10, 15, 10)
+            };
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             chkProxyEnabled = new CheckBox
             {
                 Text = "Использовать прокси-сервер",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(15, 15),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                ForeColor = Color.FromArgb(44, 62, 80),
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 0, 20),
+                Padding = new Padding(10, 8, 10, 8),
+                UseVisualStyleBackColor = true,
+                MinimumSize = new Size(400, 35)
             };
             chkProxyEnabled.CheckedChanged += (s, e) =>
             {
-                bool enabled = chkProxyEnabled.Checked;
-                txtProxyServer.Enabled = enabled;
-                numProxyPort.Enabled = enabled;
-                btnApplyProxy.Enabled = true;
+                txtProxyServer.Enabled = chkProxyEnabled.Checked;
+                numProxyPort.Enabled = chkProxyEnabled.Checked;
             };
+            layout.Controls.Add(chkProxyEnabled, 0, 0);
 
-            lblProxyServer = new Label
+            // Строка Сервер
+            var serverRow = new TableLayoutPanel
+            {
+                ColumnCount = 2,
+                RowCount = 1,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 10, 0, 10)
+            };
+            serverRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));  
+            serverRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            var lblServer = new Label
             {
                 Text = "Сервер:",
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(15, 48),
-                AutoSize = true
+                AutoSize = true,
+                Margin = new Padding(0, 10, 20, 0),
+                Padding = new Padding(8),
+                 MinimumSize = new Size(80, 30)
             };
+            serverRow.Controls.Add(lblServer, 0, 0);
 
             txtProxyServer = new TextBox
             {
-                Location = new Point(85, 45),
-                Size = new Size(190, 25),
-                Font = new Font("Segoe UI", 9),
-                Enabled = false
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                Enabled = false,
+                Dock = DockStyle.Fill,
+                Height = 40,
+                Margin = new Padding(0),
+                MinimumSize = new Size(250, 35)
             };
             txtProxyServer.TextChanged += (s, e) => btnApplyProxy.Enabled = true;
+            serverRow.Controls.Add(txtProxyServer, 1, 0);
+            layout.Controls.Add(serverRow, 0, 1);
 
-            lblProxyPort = new Label
+            // Строка Порт + Применить
+            var portRow = new TableLayoutPanel
+            {
+                ColumnCount = 4,
+                RowCount = 1,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 10, 0, 0)
+            };
+            portRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            portRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            portRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 150F));
+            portRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            var lblPort = new Label
             {
                 Text = "Порт:",
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(15, 80),
-                AutoSize = true
+                AutoSize = true,
+                Margin = new Padding(0, 10, 20, 0),
+                Padding = new Padding(8),
+                MinimumSize = new Size(80, 30)
             };
+            portRow.Controls.Add(lblPort, 0, 0);
 
             numProxyPort = new NumericUpDown
             {
-                Location = new Point(85, 77),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 Minimum = 1,
                 Maximum = 65535,
                 Value = 8080,
-                Enabled = false
+                Enabled = false,
+                Dock = DockStyle.Fill,
+                Height = 40,
+                MinimumSize = new Size(100, 35)
             };
             numProxyPort.ValueChanged += (s, e) => btnApplyProxy.Enabled = true;
+            portRow.Controls.Add(numProxyPort, 1, 0);
+
+            portRow.Controls.Add(new Label { AutoSize = false }, 2, 0);
 
             btnApplyProxy = new Button
             {
                 Text = "Применить",
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(35, 12, 35, 12),
                 FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 0 },
                 BackColor = Color.FromArgb(46, 204, 113),
                 ForeColor = Color.White,
-                Size = new Size(90, 27),
-                Location = new Point(185, 75),
-                Cursor = Cursors.Hand,
                 Enabled = false,
-                TextAlign = ContentAlignment.MiddleCenter
+                Cursor = Cursors.Hand,
+                Dock = DockStyle.Right,
+                Margin = new Padding(5, 0, 0, 0),
+                MinimumSize = new Size(120, 40)
             };
+            btnApplyProxy.FlatAppearance.BorderSize = 0;
             btnApplyProxy.Click += (s, e) => ApplyProxySettings();
+            portRow.Controls.Add(btnApplyProxy, 3, 0);
+            layout.Controls.Add(portRow, 0, 2);
 
-            btnApplyProxy.MouseEnter += (s, e) =>
-            {
-                btnApplyProxy.BackColor = ControlPaint.Light(Color.FromArgb(46, 204, 113), 0.3f);
-            };
-            btnApplyProxy.MouseLeave += (s, e) =>
-            {
-                btnApplyProxy.BackColor = Color.FromArgb(46, 204, 113);
-            };
-            btnApplyProxy.MouseDown += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btnApplyProxy.BackColor = ControlPaint.Dark(Color.FromArgb(46, 204, 113), 0.2f);
-            };
-            btnApplyProxy.MouseUp += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btnApplyProxy.BackColor = Color.FromArgb(46, 204, 113);
-            };
+            layout.Controls.Add(new Label { AutoSize = false, Height = 8 }, 0, 3);
 
-            grpProxy.Controls.Add(chkProxyEnabled);
-            grpProxy.Controls.Add(lblProxyServer);
-            grpProxy.Controls.Add(txtProxyServer);
-            grpProxy.Controls.Add(lblProxyPort);
-            grpProxy.Controls.Add(numProxyPort);
-            grpProxy.Controls.Add(btnApplyProxy);
+            grpProxy.Controls.Add(layout);
+            parent.Controls.Add(grpProxy, 0, 0);
+        }
 
-            // ===== ПАПКА ЗАГРУЗОК =====
-            rightRowY += 160;
-            CreateSectionHeader("\uE896", "Папка загрузок", new Point(rightColumnX + 48, rightRowY));
-
-            rightRowY += 30;
-
-            // Строка с путем
-            lblDownloadPath = new Label
+        private void CreateDownloadsSection(TableLayoutPanel parent)
+        {
+            grpDownloads = new GroupBox
             {
-                Text = "Путь:",
-                Font = new Font("Segoe UI", 9),
+                Text = "ПАПКА ЗАГРУЗОК",
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(rightColumnX, rightRowY + 5),
-                AutoSize = true
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Margin = new Padding(0, 25, 0, 0),
+                Padding = new Padding(25, 45, 25, 30)
             };
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 5,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(15, 10, 15, 10)
+            };
+            for (int i = 0; i < 5; i++)
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var lblPath = new Label
+            {
+                Text = "Путь сохранения:",
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 10),
+                Padding = new Padding(8)
+            };
+            layout.Controls.Add(lblPath, 0, 0);
 
             txtDownloadPath = new TextBox
             {
-                Location = new Point(rightColumnX + 40, rightRowY),
-                Size = new Size(280, 25),
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
                 ReadOnly = true,
-                BackColor = Color.White
+                Dock = DockStyle.Fill,
+                Height = 40,
+                Margin = new Padding(0, 0, 0, 20),
+                ForeColor = Color.FromArgb(44, 62, 80),
+                BackColor = Color.FromArgb(245, 246, 250),
+                MinimumSize = new Size(250, 35)
             };
+            layout.Controls.Add(txtDownloadPath, 0, 1);
 
-            // Кнопки под строкой пути
-            rightRowY += 45;
+            var btnRow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = new Padding(0, 0, 0, 20)
+            };
 
             btnBrowseDownloadPath = new Button
             {
                 Text = "Обзор...",
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(35, 12, 35, 12),
                 FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 1, BorderColor = Color.FromArgb(200, 200, 200) },
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Size = new Size(100, 30),
-                Location = new Point(rightColumnX + 70, rightRowY),
-                Cursor = Cursors.Hand
+                BackColor = Color.FromArgb(149, 165, 166),
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 20, 0),
+                MinimumSize = new Size(120, 40)
             };
+            btnBrowseDownloadPath.FlatAppearance.BorderSize = 0;
             btnBrowseDownloadPath.Click += BrowseDownloadPath_Click;
+            btnRow.Controls.Add(btnBrowseDownloadPath);
 
             btnResetDownloadPath = new Button
             {
                 Text = "Сброс",
-                Font = new Font("Segoe UI", 9),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(35, 12, 35, 12),
                 FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 1, BorderColor = Color.FromArgb(200, 200, 200) },
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(231, 76, 60),
-                Size = new Size(100, 30),
-                Location = new Point(rightColumnX + 180, rightRowY),
-                Cursor = Cursors.Hand
+                BackColor = Color.FromArgb(231, 76, 60),
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                MinimumSize = new Size(120, 40)
             };
+            btnResetDownloadPath.FlatAppearance.BorderSize = 0;
             btnResetDownloadPath.Click += ResetDownloadPath_Click;
+            btnRow.Controls.Add(btnResetDownloadPath);
+            layout.Controls.Add(btnRow, 0, 2);
 
-            // Чекбокс "Спрашивать каждый раз" - под кнопками
-            rightRowY += 40;
             chkAskEveryTime = new CheckBox
             {
                 Text = "Спрашивать каждый раз при скачивании",
-                Font = new Font("Segoe UI", 9),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                Location = new Point(rightColumnX, rightRowY),
+                Font = new Font("Segoe UI", 12, FontStyle.Regular),
+                ForeColor = Color.FromArgb(44, 62, 80),
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 10, 0, 0),
+                Padding = new Padding(10, 8, 10, 8),
+                UseVisualStyleBackColor = true,
+                MinimumSize = new Size(450, 35)
             };
             chkAskEveryTime.CheckedChanged += (s, e) =>
             {
                 AskEveryTimeToggled?.Invoke();
                 ConfigManager.SaveAskEveryTime(chkAskEveryTime.Checked);
             };
+            layout.Controls.Add(chkAskEveryTime, 0, 3);
 
-            // ===== КНОПКА ЗАКРЫТИЯ =====
-            btnClose = new Button
-            {
-                Text = "ЗАКРЫТЬ",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 0 },
-                BackColor = Color.FromArgb(52, 152, 219),
-                ForeColor = Color.White,
-                Size = new Size(120, 38),
-                Location = new Point((this.ClientSize.Width - 120) / 2, 465),
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            btnClose.Click += (s, e) => this.Close();
-
-            btnClose.MouseEnter += (s, e) =>
-            {
-                btnClose.BackColor = ControlPaint.Light(Color.FromArgb(52, 152, 219), 0.3f);
-            };
-            btnClose.MouseLeave += (s, e) =>
-            {
-                btnClose.BackColor = Color.FromArgb(52, 152, 219);
-            };
-            btnClose.MouseDown += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btnClose.BackColor = ControlPaint.Dark(Color.FromArgb(52, 152, 219), 0.2f);
-            };
-            btnClose.MouseUp += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btnClose.BackColor = Color.FromArgb(52, 152, 219);
-            };
-
-            headerPanel.Controls.Add(lblTitle);
-            this.Controls.Add(headerPanel);
-
-            // Левая колонка
-            this.Controls.Add(chkAutoStart);
-            this.Controls.Add(chkNotificationsOnTop);
-            this.Controls.Add(btnPinSettings);
-            this.Controls.Add(btnLogout);
-            this.Controls.Add(btnCheckUpdates);
-            this.Controls.Add(lblUpdateStatus);
-            this.Controls.Add(btnAbout);
-
-            // Правая колонка
-            this.Controls.Add(grpProxy);
-            this.Controls.Add(lblDownloadPath);
-            this.Controls.Add(txtDownloadPath);
-            this.Controls.Add(btnBrowseDownloadPath);
-            this.Controls.Add(btnResetDownloadPath);
-            this.Controls.Add(chkAskEveryTime);
-            this.Controls.Add(btnClose);
+            grpDownloads.Controls.Add(layout);
+            parent.Controls.Add(grpDownloads, 0, 1);
         }
 
-        // ===== МЕТОДЫ ДЛЯ ПАПКИ ЗАГРУЗОК =====
+        private Button CreateButton(string text, Color color)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(25, 14, 25, 14),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = color,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                Dock = DockStyle.Top,
+                Margin = new Padding(0, 0, 0, 12),
+                TextAlign = ContentAlignment.MiddleLeft,
+                MinimumSize = new Size(250, 45)
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            return btn;
+        }
+
+        private async Task OnCheckUpdatesClicked()
+        {
+            if (_isChecking) return;
+            _isChecking = true;
+            string orig = btnCheckUpdates.Text;
+            btnCheckUpdates.Text = "⏳ Проверка...";
+            btnCheckUpdates.Enabled = false;
+            lblUpdateStatus.Visible = false;
+            try
+            {
+                bool has = CheckUpdatesClicked != null && await CheckUpdatesClicked.Invoke();
+                lblUpdateStatus.Text = has ? "✅ Найдено обновление!" : "✅ Обновлений нет";
+                lblUpdateStatus.ForeColor = has ? Color.FromArgb(46, 204, 113) : Color.FromArgb(52, 152, 219);
+            }
+            catch (Exception ex)
+            {
+                lblUpdateStatus.Text = $"❌ {ex.Message}";
+                lblUpdateStatus.ForeColor = Color.FromArgb(231, 76, 60);
+            }
+            finally
+            {
+                lblUpdateStatus.Visible = true;
+                btnCheckUpdates.Text = orig;
+                btnCheckUpdates.Enabled = true;
+                _isChecking = false;
+            }
+        }
+
+        private void LoadSettings()
+        {
+            LoadAutoStartState();
+            LoadNotificationsOnTopState();
+            LoadProxySettings();
+            LoadDownloadPath();
+        }
+
         private void LoadDownloadPath()
         {
-            string path = ConfigManager.GetDownloadPath();
-            txtDownloadPath.Text = path;
+            txtDownloadPath.Text = ConfigManager.GetDownloadPath();
             chkAskEveryTime.Checked = ConfigManager.AskEveryTime();
         }
 
         private void BrowseDownloadPath_Click(object sender, EventArgs e)
         {
-            using (var dialog = new FolderBrowserDialog())
+            using (var dlg = new FolderBrowserDialog())
             {
-                dialog.Description = "Выберите папку для загрузок";
-                dialog.ShowNewFolderButton = true;
-
-                if (!string.IsNullOrEmpty(txtDownloadPath.Text) && Directory.Exists(txtDownloadPath.Text))
+                if (dlg.ShowDialog() == DialogResult.OK)
                 {
-                    dialog.SelectedPath = txtDownloadPath.Text;
-                }
-
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    ConfigManager.SaveDownloadPath(dialog.SelectedPath);
-                    txtDownloadPath.Text = dialog.SelectedPath;
-
-                    DownloadPathChanged?.Invoke(dialog.SelectedPath);
-
-                    System.Diagnostics.Debug.WriteLine($"💾 Путь сохранен в config: {dialog.SelectedPath}");
+                    ConfigManager.SaveDownloadPath(dlg.SelectedPath);
+                    txtDownloadPath.Text = dlg.SelectedPath;
+                    DownloadPathChanged?.Invoke(dlg.SelectedPath);
                 }
             }
         }
 
         private void ResetDownloadPath_Click(object sender, EventArgs e)
         {
-            var result = MessageBox.Show(
-                "Сбросить путь к папке загрузок по умолчанию?",
-                "Подтверждение",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
+            if (MessageBox.Show("Сбросить путь?", "Подтверждение", MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
                 ConfigManager.SaveDownloadPath(null);
-                string defaultPath = ConfigManager.GetDownloadPath();
-                txtDownloadPath.Text = defaultPath;
-
-                DownloadPathChanged?.Invoke(defaultPath);
-
-                System.Diagnostics.Debug.WriteLine($"📁 Путь сброшен на: {defaultPath}");
+                txtDownloadPath.Text = ConfigManager.GetDownloadPath();
+                DownloadPathChanged?.Invoke(txtDownloadPath.Text);
             }
-        }
-
-        // ===== ОСТАЛЬНЫЕ МЕТОДЫ =====
-        private async Task OnCheckUpdatesClicked()
-        {
-            if (_isChecking) return;
-            _isChecking = true;
-
-            btnCheckUpdates.Visible = false;
-            lblUpdateStatus.Visible = true;
-            lblUpdateStatus.Text = "⏳ Проверка...";
-            lblUpdateStatus.ForeColor = Color.FromArgb(52, 152, 219);
-            this.Refresh();
-
-            try
-            {
-                bool hasUpdate = false;
-                if (CheckUpdatesClicked != null)
-                {
-                    hasUpdate = await CheckUpdatesClicked.Invoke();
-                }
-
-                if (hasUpdate)
-                {
-                    lblUpdateStatus.Text = "✅ Обновление найдено!";
-                    lblUpdateStatus.ForeColor = Color.FromArgb(46, 204, 113);
-                    await Task.Delay(3000);
-                }
-                else
-                {
-                    lblUpdateStatus.Text = "✅ Обновлений нет";
-                    lblUpdateStatus.ForeColor = Color.FromArgb(52, 152, 219);
-                    await Task.Delay(3000);
-                }
-            }
-            catch (Exception ex)
-            {
-                lblUpdateStatus.Text = $"❌ Ошибка: {ex.Message}";
-                lblUpdateStatus.ForeColor = Color.FromArgb(231, 76, 60);
-                await Task.Delay(5000);
-            }
-            finally
-            {
-                lblUpdateStatus.Visible = false;
-                btnCheckUpdates.Visible = true;
-                _isChecking = false;
-            }
-        }
-
-        private void CreateSectionHeader(string iconChar, string text, Point location)
-        {
-            Label iconLabel = new Label
-            {
-                Text = iconChar,
-                Font = new Font("Segoe MDL2 Assets", 14, FontStyle.Regular),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                AutoSize = true,
-                Location = new Point(location.X, location.Y),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-
-            Label textLabel = new Label
-            {
-                Text = text,
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                AutoSize = true,
-                Location = new Point(location.X + 28, location.Y),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-
-            this.Controls.Add(iconLabel);
-            this.Controls.Add(textLabel);
-        }
-
-        private Button CreateStyledButton(string iconChar, string text, Color backColor, Size size, Point location, float fontSize = 10)
-        {
-            var btn = new Button
-            {
-                FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 0 },
-                BackColor = backColor,
-                ForeColor = Color.White,
-                Size = size,
-                Location = location,
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", fontSize, FontStyle.Bold),
-                Text = ""
-            };
-
-            var iconLabel = new Label
-            {
-                Text = iconChar,
-                Font = new Font("Segoe MDL2 Assets", 14, FontStyle.Regular),
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                AutoSize = true,
-                Location = new Point(12, (size.Height - 20) / 2),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Cursor = Cursors.Hand
-            };
-
-            var textLabel = new Label
-            {
-                Text = text,
-                Font = new Font("Segoe UI", fontSize, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                AutoSize = true,
-                Location = new Point(40, (size.Height - 20) / 2),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Cursor = Cursors.Hand
-            };
-
-            btn.Controls.Add(iconLabel);
-            btn.Controls.Add(textLabel);
-
-            iconLabel.Click += (s, e) => btn.PerformClick();
-            textLabel.Click += (s, e) => btn.PerformClick();
-
-            btn.MouseEnter += (s, e) =>
-            {
-                btn.BackColor = ControlPaint.Light(backColor, 0.3f);
-            };
-            btn.MouseLeave += (s, e) =>
-            {
-                btn.BackColor = backColor;
-            };
-            btn.MouseDown += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btn.BackColor = ControlPaint.Dark(backColor, 0.2f);
-            };
-            btn.MouseUp += (s, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    btn.BackColor = backColor;
-            };
-
-            return btn;
         }
 
         private bool IsAutoStartEnabled()
         {
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", false))
-            {
-                return key?.GetValue("MaxLight") != null;
-            }
+            using (var k = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", false))
+                return k?.GetValue("MaxLight") != null;
         }
 
         private void LoadAutoStartState()
         {
-            if (_isPortable)
-            {
-                chkAutoStart.Checked = false;
-                return;
-            }
-
-            chkAutoStart.Checked = IsAutoStartEnabled();
+            if (!_isPortable) chkAutoStart.Checked = IsAutoStartEnabled();
         }
 
         private void LoadNotificationsOnTopState()
         {
-            try
-            {
-                bool isOnTop = ConfigManager.GetNotificationsOnTop();
-                chkNotificationsOnTop.Checked = isOnTop;
-            }
-            catch
-            {
-                chkNotificationsOnTop.Checked = true;
-            }
+            chkNotificationsOnTop.Checked = ConfigManager.GetNotificationsOnTop();
         }
 
         private void LoadProxySettings()
         {
-            try
+            var proxy = ConfigManager.GetProxySettings();
+            if (proxy != null)
             {
-                var proxy = ConfigManager.GetProxySettings();
-                _originalProxySettings = proxy != null ? new ConfigManager.ProxySettings
-                {
-                    Enabled = proxy.Enabled,
-                    Server = proxy.Server,
-                    Port = proxy.Port
-                } : null;
-
-                if (proxy != null)
-                {
-                    chkProxyEnabled.Checked = proxy.Enabled;
-                    txtProxyServer.Text = proxy.Server ?? "";
-                    numProxyPort.Value = proxy.Port > 0 ? proxy.Port : 8080;
-                }
-                else
-                {
-                    chkProxyEnabled.Checked = false;
-                    txtProxyServer.Text = "";
-                    numProxyPort.Value = 8080;
-                }
-
-                txtProxyServer.Enabled = chkProxyEnabled.Checked;
-                numProxyPort.Enabled = chkProxyEnabled.Checked;
-                btnApplyProxy.Enabled = false;
+                chkProxyEnabled.Checked = proxy.Enabled;
+                txtProxyServer.Text = proxy.Server ?? "";
+                numProxyPort.Value = proxy.Port > 0 ? proxy.Port : 8080;
             }
-            catch
-            {
-                chkProxyEnabled.Checked = false;
-                txtProxyServer.Text = "";
-                numProxyPort.Value = 8080;
-                txtProxyServer.Enabled = false;
-                numProxyPort.Enabled = false;
-                btnApplyProxy.Enabled = false;
-                _originalProxySettings = null;
-            }
-        }
-
-        private bool HasProxySettingsChanged()
-        {
-            bool currentEnabled = chkProxyEnabled.Checked;
-            string currentServer = txtProxyServer.Text.Trim();
-            int currentPort = (int)numProxyPort.Value;
-
-            if (_originalProxySettings == null)
-            {
-                return currentEnabled || !string.IsNullOrEmpty(currentServer) || currentPort != 8080;
-            }
-
-            return _originalProxySettings.Enabled != currentEnabled ||
-                   _originalProxySettings.Server != currentServer ||
-                   _originalProxySettings.Port != currentPort;
+            txtProxyServer.Enabled = numProxyPort.Enabled = chkProxyEnabled.Checked;
         }
 
         private void ApplyProxySettings()
         {
-            try
-            {
-                if (!HasProxySettingsChanged())
-                {
-                    System.Diagnostics.Debug.WriteLine("ℹ️ Настройки прокси не изменились");
-                    this.Close();
-                    return;
-                }
-
-                bool enabled = chkProxyEnabled.Checked;
-                string server = txtProxyServer.Text.Trim();
-                int port = (int)numProxyPort.Value;
-
-                if (enabled && (string.IsNullOrEmpty(server) || port <= 0))
-                {
-                    var result = MessageBox.Show(
-                        "Для использования прокси необходимо указать сервер и порт.\n" +
-                        "Отключить прокси?",
-                        "Неверные настройки прокси",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Warning);
-
-                    if (result == DialogResult.Yes)
-                    {
-                        enabled = false;
-                        chkProxyEnabled.Checked = false;
-                        txtProxyServer.Enabled = false;
-                        numProxyPort.Enabled = false;
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-
-                ConfigManager.SaveProxySettings(enabled, server, port);
-
-                System.Diagnostics.Debug.WriteLine($"🌐 Настройки прокси сохранены: {enabled}");
-
-                ProxySettingsChanged?.Invoke();
-                this.Close();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка сохранения настроек прокси: {ex.Message}",
-                    "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            ConfigManager.SaveProxySettings(chkProxyEnabled.Checked, txtProxyServer.Text.Trim(), (int)numProxyPort.Value);
+            ProxySettingsChanged?.Invoke();
+            Close();
         }
 
-        public void SetAutoStartChecked(bool enabled)
-        {
-            if (_isPortable) return;
-            chkAutoStart.Checked = enabled;
-        }
-
-        public void SetNotificationsOnTopChecked(bool enabled)
-        {
-            chkNotificationsOnTop.Checked = enabled;
-        }
-
-        public void SetProxySettings(bool enabled, string server, int port)
-        {
-            chkProxyEnabled.Checked = enabled;
-            txtProxyServer.Text = server;
-            numProxyPort.Value = port;
-            btnApplyProxy.Enabled = false;
-        }
+        public void SetAutoStartChecked(bool en) { if (!_isPortable) chkAutoStart.Checked = en; }
+        public void SetNotificationsOnTopChecked(bool en) { chkNotificationsOnTop.Checked = en; }
     }
 }

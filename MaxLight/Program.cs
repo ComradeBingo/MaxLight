@@ -25,9 +25,15 @@ namespace MaxLight
         [STAThread]
         static void Main()
         {
-            
             try
             {
+                // ===== ВКЛЮЧАЕМ ПОДДЕРЖКУ HIGH DPI =====
+                // Для .NET Framework 4.7+ используем app.manifest с PerMonitorV2
+                // А здесь только базовые настройки
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                
+
                 bool isPortable = IsPortableMode();
 
                 if (!isPortable)
@@ -44,12 +50,7 @@ namespace MaxLight
                     }
                 }
 
-
-
                 VelopackApp.Build().Run();
-
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
 
                 var form1 = new Form1(_activateEvent);
                 _mainForm = form1;
@@ -66,6 +67,13 @@ namespace MaxLight
                 MessageBox.Show($"Ошибка запуска: {ex.Message}", "Ошибка",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            finally
+            {
+                // Очистка ресурсов при завершении
+                _updateCheckerCts?.Cancel();
+                _updateCheckerCts?.Dispose();
+                _activateEvent?.Dispose();
+            }
         }
 
         // ========== ФОНОВЫЙ ПРОВЕРЩИК ОБНОВЛЕНИЙ ==========
@@ -74,7 +82,15 @@ namespace MaxLight
             Debug.WriteLine($"🔄 Запущен фоновый проверщик обновлений (интервал: {CheckInterval.TotalHours} ч)");
 
             // Первая проверка через 5 секунд после запуска (чтобы форма успела загрузиться)
-            await Task.Delay(5000, cancellationToken);
+            try
+            {
+                await Task.Delay(5000, cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                Debug.WriteLine("⏹️ Проверка обновлений остановлена на старте");
+                return;
+            }
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -94,7 +110,15 @@ namespace MaxLight
                 {
                     Debug.WriteLine($"❌ Ошибка в фоновом проверщике: {ex.Message}");
                     // В случае ошибки ждем 15 минут и пробуем снова
-                    await Task.Delay(TimeSpan.FromMinutes(15), cancellationToken);
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(15), cancellationToken);
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        Debug.WriteLine("⏹️ Проверка обновлений остановлена после ошибки");
+                        break;
+                    }
                 }
             }
         }
@@ -255,6 +279,7 @@ namespace MaxLight
                 using (var client = new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("User-Agent", "MaxLight-App");
+                    client.Timeout = TimeSpan.FromSeconds(10); // Добавляем таймаут
                     var response = await client.GetAsync(apiUrl);
 
                     if (response.IsSuccessStatusCode)
@@ -276,6 +301,10 @@ namespace MaxLight
             catch (HttpRequestException)
             {
                 return "⚠️ Не удалось подключиться к GitHub для загрузки описания изменений.";
+            }
+            catch (TaskCanceledException)
+            {
+                return "⚠️ Таймаут при загрузке описания изменений.";
             }
             catch (Exception ex)
             {

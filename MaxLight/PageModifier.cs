@@ -37,12 +37,29 @@ namespace MaxLight
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = e.Uri,
-                    UseShellExecute = true
-                });
+                var uri = new Uri(e.Uri);
+                bool isOwnDomain =
+                    uri.Host.EndsWith("max.ru", StringComparison.OrdinalIgnoreCase) ||
+                    uri.Host.EndsWith("oneme.ru", StringComparison.OrdinalIgnoreCase);
+
                 e.Handled = true;
+
+                if (isOwnDomain)
+                {
+                    // Файловый эндпоинт MAX (fd.oneme.ru/getfile?...) — не выкидываем
+                    // во внешний браузер, а навигируем в том же WebView2.
+                    // Тогда штатно сработает CoreWebView2.DownloadStarting.
+                    _webView.CoreWebView2.Navigate(e.Uri);
+                }
+                else
+                {
+                    // Реально внешняя ссылка — как и раньше, открываем в браузере по умолчанию
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = e.Uri,
+                        UseShellExecute = true
+                    });
+                }
             }
             catch (Exception ex)
             {
