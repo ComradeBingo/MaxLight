@@ -1,0 +1,114 @@
+﻿<Window x:Class="MaxLight.PinSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Управление PIN-кодом"
+        Height="380" Width="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <Border Background="#424B79" CornerRadius="12">
+		<Border.Effect>
+			<DropShadowEffect ShadowDepth="4" Opacity="0.3" BlurRadius="20"/>
+		</Border.Effect>
+
+		<Grid Margin="30">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+			</Grid.RowDefinitions>
+
+			<!-- Заголовок -->
+			<TextBlock Grid.Row="0"
+                       Text="Управление PIN-кодом"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,15"/>
+
+			<!-- Текущий PIN -->
+			<StackPanel Grid.Row="1" Margin="0,0,0,15">
+				<TextBlock Text="Текущий PIN-код"
+                           Foreground="White"
+                           FontSize="12"
+                           Margin="0,0,0,5"/>
+				<PasswordBox x:Name="txtCurrentPin"
+                             Height="35"
+                             FontSize="14"
+                             Background="White"
+                             Foreground="#3C3C3C"
+                             BorderBrush="#555555"
+                             BorderThickness="1"
+                             Padding="8,0"/>
+			</StackPanel>
+
+			<!-- Новый PIN -->
+			<StackPanel Grid.Row="2" Margin="0,0,0,15">
+				<TextBlock Text="Новый PIN-код (оставьте пустым для удаления)"
+                           Foreground="White"
+                           FontSize="12"
+                           Margin="0,0,0,5"/>
+				<PasswordBox x:Name="txtNewPin"
+                             Height="35"
+                             FontSize="14"
+                             Background="White"
+                             Foreground="#3C3C3C"
+                             BorderBrush="#555555"
+                             BorderThickness="1"
+                             Padding="8,0"
+                             MaxLength="6"/>
+				<TextBlock x:Name="lblStatus"
+                           Text=""
+                           FontSize="11"
+                           Margin="0,5,0,0"
+                           Visibility="Collapsed"/>
+			</StackPanel>
+
+			<!-- Кнопки -->
+			<StackPanel Grid.Row="3"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,10,0,0">
+				<Button x:Name="btnOk"
+                        Content="Сохранить"
+                        Width="160" Height="40"
+                        Background="#27AE60"
+                        Foreground="White"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Click="BtnOk_Click"/>
+				<Button x:Name="btnCancel"
+                        Content="Отмена"
+                        Width="120" Height="40"
+                        Background="#555555"
+                        Foreground="White"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Margin="10,0,0,0"
+                        Click="BtnCancel_Click"/>
+			</StackPanel>
+
+			<!-- Подпись -->
+			<TextBlock Grid.Row="4"
+                       Text="PIN-код должен содержать 4-6 цифр"
+                       FontSize="14"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Bottom"
+                       Margin="0,10,0,0"
+                       x:Name="lblHint"/>
+		</Grid>
+	</Border>
+</Window>

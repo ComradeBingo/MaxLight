@@ -1,0 +1,134 @@
+﻿<Window x:Class="MaxLight.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="О программе"
+        Width="900"
+        Height="660"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="HeaderBackground" Color="#424B79"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceLightBrush" Color="#F5F6FA"/>
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#34495E"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#505050"/>
+        <SolidColorBrush x:Key="TextLightBrush" Color="#969696"/>
+        <SolidColorBrush x:Key="ButtonBlue" Color="#3498DB"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#E0E0E0"/>
+    </Window.Resources>
+
+    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="12">
+        <Border.Effect>
+            <DropShadowEffect ShadowDepth="4" Opacity="0.2" BlurRadius="20"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Шапка -->
+            <Border Grid.Row="0" Background="{StaticResource HeaderBackground}" CornerRadius="12,12,0,0" Height="56"
+                    MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Margin="20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="txtTitle" Text="Max Light" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock x:Name="txtVersion" Text="Версия 1.0.0" FontSize="11" Foreground="#BDC3C7"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Контент -->
+            <Grid Grid.Row="1" Margin="24,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="135*"/>
+                    <ColumnDefinition Width="92*"/>
+                    <ColumnDefinition Width="Auto" MinWidth="285"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Левая колонка -->
+                <StackPanel Grid.Column="0" Grid.ColumnSpan="4">
+                    <TextBlock Text="Лёгкий защищенный клиент MAX Messenger"
+                               FontSize="16" FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock Text="🔒 PIN-код (DPAPI шифрование)" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="🛡️ Блокировка трекеров" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="🔐 Зашифрованное хранилище (AES-256)" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="📊 Счетчик непрочитанных сообщений" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="🚫 Блокировка рекламного баннера" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="🔔 Уведомления в трее и панели задач" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="⚡ Лёгкие и быстрые дельта-обновления" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="🌐 Поддержка работы с прокси" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="💼 Обычная и portable версии" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="© 2026 MaxLight" FontSize="11"
+                               Foreground="{StaticResource TextLightBrush}"
+                               VerticalAlignment="Bottom" Margin="0,8,0,0"/>
+                </StackPanel>
+
+                <!-- Правая колонка -->
+                <StackPanel Grid.Column="5" HorizontalAlignment="Center" Width="160">
+                    <!-- Иконка -->
+                    <Image x:Name="imgIcon" Width="160" Height="160" Stretch="Uniform" Margin="0,0,0,16"/>
+
+                    <!-- GitHub кнопка -->
+                    <Button Content="GitHub"
+                            Background="{StaticResource HeaderBackground}"
+                            Foreground="White"
+                            FontSize="16" FontWeight="Bold"
+                            Padding="35,8"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            Click="GitHub_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}"
+                                        CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#56589D"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Нижняя панель -->
+            <Border Grid.Row="2" Background="{StaticResource SurfaceLightBrush}" CornerRadius="0,0,12,12"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Height="60">
+                <Button Content="ЗАКРЫТЬ"
+                        Background="{StaticResource HeaderBackground}"
+                        Foreground="White"
+                        FontSize="14" FontWeight="Bold"
+                        Width="125"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Click="BtnClose_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="6"
+                                    Padding="30,10">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

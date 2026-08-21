@@ -1,0 +1,166 @@
+﻿<Window x:Class="MaxLight.PinEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ввод PIN-кода"
+        Height="380" Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        ShowInTaskbar="True"
+        Topmost="True"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Focusable="True"
+        ShowActivated="True">
+
+    <Border Background="#424B79" CornerRadius="12">
+        <Border.Effect>
+            <DropShadowEffect ShadowDepth="4" Opacity="0.3" BlurRadius="20"/>
+        </Border.Effect>
+
+        <Grid Margin="30">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Заголовок -->
+            <TextBlock Grid.Row="0"
+                       Text="Введите PIN-код"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,15"/>
+
+            <!-- Иконка замка -->
+            <TextBlock Grid.Row="1"
+                       Text="🔒"
+                       FontSize="44"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,15"/>
+
+            <!-- Описание -->
+            <TextBlock Grid.Row="2"
+                       Text="Для доступа к приложению введите ваш PIN-код"
+                       FontSize="13"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,25"/>
+
+            <!-- Поле ввода PIN -->
+            <StackPanel Grid.Row="3" Margin="0,0,0,20">
+                <PasswordBox x:Name="txtPin"
+                             MaxLength="6"
+                             Height="45"
+                             FontSize="22"
+                             Background="White"
+                             Foreground="#3C3C3C"
+                             BorderBrush="#555555"
+                             BorderThickness="1"
+                             HorizontalContentAlignment="Center"
+                             KeyDown="TxtPin_KeyDown"
+                             PasswordChanged="TxtPin_PasswordChanged"/>
+
+                <TextBlock x:Name="lblError"
+                           Text="Неверный PIN-код"
+                           Foreground="#E74C3C"
+                           FontSize="12"
+                           Visibility="Collapsed"
+                           Margin="0,8,0,0"
+                           HorizontalAlignment="Center"/>
+
+                <TextBlock x:Name="lblAttempts"
+                           Text=""
+                           Foreground="#666666"
+                           FontSize="11"
+                           Visibility="Collapsed"
+                           Margin="0,5,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Кнопки -->
+            <StackPanel Grid.Row="4"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,0">
+                <Button x:Name="btnUnlock"
+                        Content="Разблокировать"
+                        Width="150" Height="40"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        IsEnabled="False"
+                        Click="BtnUnlock_Click">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="#27AE60"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#666666"/>
+                                    <Setter Property="Foreground" Value="#AAAAAA"/>
+                                    <!-- Исправлено: Cursor="Arrow" вместо "Default" -->
+                                    <Setter Property="Cursor" Value="Arrow"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#2ECC71"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#1E8449"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button x:Name="btnCancel"
+                        Content="Отмена"
+                        Width="100" Height="40"
+                        Background="#555555"
+                        Foreground="White"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Margin="10,0,0,0"
+                        Click="BtnCancel_Click">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="#555555"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#777777"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="#444444"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+
+            <!-- Подпись снизу -->
+            <TextBlock Grid.Row="5"
+                       Text="Осталось попыток: 5"
+                       FontSize="12"
+                       Foreground="#D21F3C"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Bottom"
+                       Margin="0,10,0,0"
+                       Visibility="Collapsed"
+                       x:Name="lblAttemptsInfo"/>
+        </Grid>
+    </Border>
+</Window>
