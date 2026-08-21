@@ -7,12 +7,12 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>app.ico</ApplicationIcon>
-		<AssemblyVersion>2.0.0</AssemblyVersion>
+		<AssemblyVersion>2.1.0</AssemblyVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
-		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
 		<PackageReference Include="Velopack" Version="1.2.0" />
 	</ItemGroup>
 

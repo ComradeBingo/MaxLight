@@ -47,27 +47,7 @@ public partial class App : Application
 
         ConfigManager.EnsureConfigExists();
 
-        if (!IsDotNetRuntimeInstalled())
-        {
-            var result = MessageBox.Show(
-                "Требуется .NET Runtime 10.0\n\n" +
-                "Открыть страницу загрузки?",
-                "MaxLight — Ошибка",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Error);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "https://dotnet.microsoft.com/download/dotnet/10.0",
-                    UseShellExecute = true
-                });
-            }
-
-            Shutdown();
-            return;
-        }
+        
 
         VelopackApp.Build().Run();
     }
