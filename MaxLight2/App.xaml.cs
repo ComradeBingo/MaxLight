@@ -47,7 +47,27 @@ public partial class App : Application
 
         ConfigManager.EnsureConfigExists();
 
-        
+        if (!IsDotNetRuntimeInstalled())
+        {
+            var result = MessageBox.Show(
+                "Требуется .NET Runtime 10.0\n\n" +
+                "Открыть страницу загрузки?",
+                "MaxLight — Ошибка",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Error);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://dotnet.microsoft.com/download/dotnet/10.0",
+                    UseShellExecute = true
+                });
+            }
+
+            Shutdown();
+            return;
+        }
 
         VelopackApp.Build().Run();
     }
@@ -151,7 +171,7 @@ public partial class App : Application
     private static extern bool FlashWindow(System.IntPtr hWnd, bool bInvert);
 
 
-    //Надо через Velopack собирать билд с флагом "-f net10-x64-runtime"
+    //Надо через Velopack собирать билд с флагом "-f net10-x64-desktop"
     //ибо если юзер на старом фреймворке, чтобы не пришлось качать отдельно через открытие браузера.
     //А с флагом типа автоматом дёрнет (в фоне, да не совсем...)
     private static bool IsDotNetRuntimeInstalled()
@@ -182,6 +202,4 @@ public partial class App : Application
             return false;
         }
     }
-
-    
 }
