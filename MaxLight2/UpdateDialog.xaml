@@ -58,7 +58,7 @@
                         BorderThickness="1">
                     <TextBox x:Name="txtReleaseNotes"
                              Text="Описание изменений..."
-                             FontSize="11"
+                             FontSize="14"
                              Foreground="#34495E"
                              Background="Transparent"
                              BorderThickness="0"
