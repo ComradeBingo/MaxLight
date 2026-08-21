@@ -173,10 +173,16 @@ public class UpdateChecker
 
             Debug.WriteLine("🔄 Применение обновления и перезапуск...");
 
-            // Применяем обновление и перезапускаем приложение
-            _updateManager.ApplyUpdatesAndRestart(newVersion);
+            // 🔥 Даем время на завершение всех операций ввода-вывода
+            await Task.Delay(1500);
 
-            // Если мы дошли сюда, значит что-то пошло не так
+            // 🔥 Запускаем синхронный метод в отдельном потоке
+            await Task.Run(() =>
+            {
+                _updateManager.ApplyUpdatesAndRestart(newVersion);
+            });
+
+            // Этот код выполняется только если ApplyUpdatesAndRestart выбросил исключение
             Debug.WriteLine("❌ Не удалось применить обновление");
             MessageBox.Show("Не удалось применить обновление. Попробуйте установить вручную.",
                           "Ошибка",

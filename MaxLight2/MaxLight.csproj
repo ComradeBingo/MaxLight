@@ -7,9 +7,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>app.ico</ApplicationIcon>
-		<AssemblyVersion>2.3.0</AssemblyVersion>
+		<AssemblyVersion>2.3.1</AssemblyVersion>
 		<Configurations>Debug;Release;ReleaseX64</Configurations>
-		<Platforms>AnyCPU;x64</Platforms>
+		<Platforms>x64</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>

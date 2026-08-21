@@ -15,28 +15,34 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // 🔥 Проверяем, является ли запуск частью обновления Velopack
+        var args = Environment.GetCommandLineArgs();
+        bool isVelopackUpdate = args.Any(a =>
+            a.Contains("--veloapp", StringComparison.OrdinalIgnoreCase) ||
+            a.Contains("--squirrel", StringComparison.OrdinalIgnoreCase));
+
         // Проверяем, является ли приложение portable
         bool isPortable = IsPortableMode();
 
-        if (!isPortable)
+        if (!isPortable && !isVelopackUpdate)
         {
-            // Проверка на единственный экземпляр (только для НЕ portable)
+            // Проверка на единственный экземпляр (только для НЕ portable и НЕ обновления)
             bool isNewInstance;
             _mutex = new Mutex(true, "MaxLight_Unique_Instance_2024", out isNewInstance);
 
             if (!isNewInstance)
             {
                 Debug.WriteLine("⚠️ Приложение уже запущено! Активируем существующее окно.");
-
-                // Активируем существующее окно
                 ActivateExistingWindow();
-
-                // Закрываем новую копию
                 Shutdown();
                 return;
             }
 
             Debug.WriteLine("✅ Приложение запущено в единственном экземпляре");
+        }
+        else if (isVelopackUpdate)
+        {
+            Debug.WriteLine("🔄 Запуск через Velopack (обновление) — пропускаем проверку мьютекса");
         }
         else
         {
@@ -47,6 +53,10 @@ public partial class App : Application
 
         ConfigManager.EnsureConfigExists();
 
+        // 🔥 Инициализируем Velopack ДО проверки .NET Runtime
+        VelopackApp.Build().Run();
+
+        // Проверяем наличие .NET Runtime (теперь после Velopack, который мог его установить)
         if (!IsDotNetRuntimeInstalled())
         {
             var result = MessageBox.Show(
@@ -68,8 +78,6 @@ public partial class App : Application
             Shutdown();
             return;
         }
-
-        VelopackApp.Build().Run();
     }
 
     private bool IsPortableMode()
@@ -84,7 +92,7 @@ public partial class App : Application
         if (File.Exists(Path.Combine(exePath, ".portable")))
             return true;
 
-        //  поднимаемся на директорию выше (для Velopack)
+        // Поднимаемся на директорию выше (для Velopack)
         var parentDir = Directory.GetParent(exePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         if (parentDir != null && File.Exists(Path.Combine(parentDir.FullName, ".portable")))
             return true;
@@ -92,8 +100,6 @@ public partial class App : Application
         return false;
     }
 
-
-    // Обработка разворачивания окна при повторной попытке запуска в НЕпортейбл режиме
     private void ActivateExistingWindow()
     {
         try
@@ -111,12 +117,10 @@ public partial class App : Application
 
                     const int SW_RESTORE = 9;
 
-                    // Показываем и активируем окно через WinAPI
                     ShowWindow(process.MainWindowHandle, SW_RESTORE);
                     SetForegroundWindow(process.MainWindowHandle);
                     FlashWindow(process.MainWindowHandle, true);
 
-                    // Пытаемся восстановить окно из трея через WPF
                     try
                     {
                         Application.Current.Dispatcher.Invoke(() =>
@@ -124,12 +128,10 @@ public partial class App : Application
                             var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
                             if (mainWindow != null)
                             {
-                                // Если окно скрыто (в трее) - восстанавливаем
                                 if (mainWindow.Visibility == Visibility.Hidden)
                                 {
                                     mainWindow.RestoreFromTray();
                                 }
-                                // Если окно свернуто - разворачиваем
                                 else if (mainWindow.WindowState == WindowState.Minimized)
                                 {
                                     mainWindow.WindowState = WindowState.Normal;
@@ -170,10 +172,6 @@ public partial class App : Application
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool FlashWindow(System.IntPtr hWnd, bool bInvert);
 
-
-    //Надо через Velopack собирать билд с флагом "-f net10-x64-desktop"
-    //ибо если юзер на старом фреймворке, чтобы не пришлось качать отдельно через открытие браузера.
-    //А с флагом типа автоматом дёрнет (в фоне, да не совсем...)
     private static bool IsDotNetRuntimeInstalled()
     {
         try
@@ -198,7 +196,6 @@ public partial class App : Application
         }
         catch
         {
-            // dotnet не найден в PATH
             return false;
         }
     }
