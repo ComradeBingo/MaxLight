@@ -1,0 +1,44 @@
+<Project>
+  <PropertyGroup>
+    <Company>ComradeBingo</Company>
+    <ProductName>MaxLight</ProductName>
+    <PackageId>MaxLight</PackageId>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ComradeBingo/MaxLight.git</RepositoryUrl>
+  </PropertyGroup>
+
+  <!-- ============================================ -->
+  <!-- ИСКЛЮЧЕНИЯ: НЕ ОБНОВЛЯТЬ ЭТО (ОНИ ЗАНЯТЫ) -->
+  <!-- ============================================ -->
+
+  <!-- КРИТИЧЕСКИ ВАЖНО: WebView2 сессии и данные -->
+  <!-- Эти файлы открыты процессом msedge.exe и НЕ МОГУТ быть переписаны -->
+  <ItemGroup>
+    <VelopackExcludedPath Include="WebView2Sessions" />
+  </ItemGroup>
+
+  <!-- Конфигурация пользователя -->
+  <ItemGroup>
+    <VelopackExcludedPath Include="config.json" />
+  </ItemGroup>
+
+  <!-- Кэш, базы данных, логи (на всякий случай) -->
+  <ItemGroup>
+    <VelopackExcludedPath Include="*.db" />
+    <VelopackExcludedPath Include="*.sqlite" />
+    <VelopackExcludedPath Include="*.log" />
+    <VelopackExcludedPath Include="*.cache" />
+    <VelopackExcludedPath Include="*.pma" />
+    <VelopackExcludedPath Include="*.baj" />
+    <VelopackExcludedPath Include="*.baf" />
+  </ItemGroup>
+  
+  <!-- Исключить все подпапки с данными (LOCK, LOG и т.д.) -->
+  <ItemGroup>
+    <VelopackExcludedPath Include="**\*.db-journal" />
+    <VelopackExcludedPath Include="**\LOCK" />
+    <VelopackExcludedPath Include="**\LOG" />
+    <VelopackExcludedPath Include="**\CURRENT" />
+    <VelopackExcludedPath Include="**\MANIFEST-*" />
+  </ItemGroup>
+</Project>

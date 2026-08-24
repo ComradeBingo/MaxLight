@@ -7,7 +7,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>app.ico</ApplicationIcon>
-		<AssemblyVersion>2.3.1</AssemblyVersion>
+		<AssemblyVersion>2.0.0</AssemblyVersion>
 		<Configurations>Debug;Release;ReleaseX64</Configurations>
 		<Platforms>x64</Platforms>
 	</PropertyGroup>
@@ -30,6 +30,10 @@
 		<Content Include="app.ico">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="MaxLight.velopackproj" />
 	</ItemGroup>
 
 	<ItemGroup>
