@@ -335,10 +335,13 @@ public partial class MainWindow : Window
 
     private void UpdateNotification_Click(object sender, MouseButtonEventArgs e)
     {
+        Debug.WriteLine($"📢 1. UpdateNotification_Click НАЧАЛО");
+
         if (_updateChecker?.HasUpdate == true)
         {
-            Debug.WriteLine($"📢 UpdateNotification_Click: version={_updateChecker.UpdateVersion}, notes length={_updateChecker.UpdateReleaseNotes?.Length ?? 0}");
+            Debug.WriteLine($"📢 2. HasUpdate = true, version={_updateChecker.UpdateVersion}");
 
+            Debug.WriteLine($"📢 3. Создание UpdateDialog...");
             var d = new UpdateDialog(
                 _updateChecker.UpdateVersion,
                 _updateChecker.UpdateReleaseNotes ?? "📝 Описание изменений не найдено.",
@@ -346,13 +349,32 @@ public partial class MainWindow : Window
             {
                 Owner = this
             };
+            Debug.WriteLine($"📢 4. UpdateDialog создан");
 
-            if (d.ShowDialog() == true && d.UpdateAccepted)
+            Debug.WriteLine($"📢 5. Показ диалога...");
+            var result = d.ShowDialog();
+            Debug.WriteLine($"📢 6. Диалог закрыт. result={result}, UpdateAccepted={d.UpdateAccepted}");
+
+            if (result == true && d.UpdateAccepted)
             {
+                Debug.WriteLine($"📢 7. УСЛОВИЕ ВЫПОЛНЕНО! Вызываем обновление...");
                 HideUpdateNotification();
-                _ = _updateChecker.DownloadAndInstallUpdateAsync();
+
+                Debug.WriteLine($"📢 8. ПЕРЕД вызовом DownloadAndInstallUpdateAsync()");
+                var task = _updateChecker.DownloadAndInstallUpdateAsync();
+                Debug.WriteLine($"📢 9. ПОСЛЕ вызова DownloadAndInstallUpdateAsync(), task={task?.Status}");
+            }
+            else
+            {
+                Debug.WriteLine($"📢 7. УСЛОВИЕ НЕ ВЫПОЛНЕНО");
             }
         }
+        else
+        {
+            Debug.WriteLine($"📢 2. HasUpdate = false или _updateChecker = null");
+        }
+
+        Debug.WriteLine($"📢 10. UpdateNotification_Click КОНЕЦ");
     }
     public void ShowUpdateNotification(string v) { _updateVersion = v; _hasUpdate = true; lblUpdateNotification.Text = $"ОБНОВИТЬ ДО {v}"; updateNotification.Visibility = Visibility.Visible; }
     public void HideUpdateNotification() { _hasUpdate = false; updateNotification.Visibility = Visibility.Collapsed; }

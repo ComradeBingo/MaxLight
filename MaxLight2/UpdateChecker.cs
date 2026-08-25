@@ -143,6 +143,7 @@ public class UpdateChecker
     //100500 раз надо все перепроверять, чтобы не просохотатить последующие обновы при переходе на NET10 
     public async Task DownloadAndInstallUpdateAsync()
     {
+        Debug.WriteLine("DownloadAndInstallUpdateAsync() ВЫЗВАН!!!111");
         try
         {
             if (_updateManager == null)
@@ -177,10 +178,10 @@ public class UpdateChecker
             await Task.Delay(1500);
 
             // 🔥 Запускаем синхронный метод в отдельном потоке
-            await Task.Run(() =>
-            {
+            
+            
                 _updateManager.ApplyUpdatesAndRestart(newVersion);
-            });
+            
 
             // Этот код выполняется только если ApplyUpdatesAndRestart выбросил исключение
             Debug.WriteLine("❌ Не удалось применить обновление");

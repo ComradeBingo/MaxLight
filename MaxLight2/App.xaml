@@ -1,7 +1,7 @@
 ﻿<Application x:Class="MaxLight.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             StartupUri="MainWindow.xaml">
+             >
     <Application.Resources>
         <Style x:Key="TitleBarButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
