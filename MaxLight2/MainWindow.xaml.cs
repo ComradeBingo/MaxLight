@@ -235,7 +235,7 @@ public partial class MainWindow : Window
         if (this.WindowState == WindowState.Minimized)
         {
             _webViewHandler?.UpdateWindowActiveState(false);
-            _webViewHandler?.HideWebView();
+           // _webViewHandler?.HideWebView(); //фикс рендера webview при разворачивании фуллскрин окна из таскбара
 
             _suppressFlashing = true;
             Task.Run(async () =>
@@ -250,6 +250,7 @@ public partial class MainWindow : Window
             _webViewHandler?.UpdateWindowActiveState(true);
             StopFlashing();
         }
+
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -295,6 +296,7 @@ public partial class MainWindow : Window
     {
         _trayManager?.RestoreFromTray();
         _webViewHandler?.ShowWebView();
+        LoadWindowState();
     }
     private void ToggleWindow() { if (IsVisible && WindowState != WindowState.Minimized) MinimizeToTray(); else RestoreFromTray(); }
 
@@ -377,7 +379,12 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e) => ShowSettings();
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
     private void Close_Click(object sender, RoutedEventArgs e) => MinimizeToTray();
-    private void ToggleMaximize() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+      
+    }
 
     private void SaveWindowState()
     { if (_isRestoring) return; if (WindowState == WindowState.Normal) ConfigManager.SaveWindowState((int)Left, (int)Top, (int)Width, (int)Height, false); else if (WindowState == WindowState.Maximized) { var b = RestoreBounds; ConfigManager.SaveWindowState((int)b.Left, (int)b.Top, (int)b.Width, (int)b.Height, true); } }
@@ -390,6 +397,7 @@ public partial class MainWindow : Window
         if (!_exitRequested)
         {
             e.Cancel = true;
+            
             MinimizeToTray();
         }
         else
