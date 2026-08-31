@@ -22,15 +22,21 @@ public partial class UpdateDialog : Window
     {
         Debug.WriteLine("📢 UpdateDialog: пользователь нажал Обновить");
         UpdateAccepted = true;
+
+        // 1. Помечаем событие как обработанное, чтобы DragMove не перехватил его
+        e.Handled = true;
+
+        // 2. Закрываем модальное окно через DialogResult
         this.DialogResult = true;
-        this.Close();
     }
 
     private void BtnSkip_Click(object sender, RoutedEventArgs e)
     {
         Debug.WriteLine("📢 UpdateDialog: пользователь нажал Пропустить");
         UpdateAccepted = false;
+
+        // Делаем то же самое для кнопки пропуска
+        e.Handled = true;
         this.DialogResult = false;
-        this.Close();
     }
 }
