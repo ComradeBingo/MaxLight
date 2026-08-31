@@ -31,6 +31,7 @@ public class WindowResizeHelper
     public void HandleResize(IntPtr handle, MouseButtonState leftButton, Point mousePosition)
     {
         if (leftButton != MouseButtonState.Pressed) return;
+        
 
         int hit = GetResizeDirection(mousePosition);
         if (hit != 0)

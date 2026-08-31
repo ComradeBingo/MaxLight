@@ -188,12 +188,24 @@ public partial class MainWindow : Window
         const int WM_ACTIVATE = 0x0006, WM_CLOSE = 0x0010, WM_GETMINMAXINFO = 0x0024;
         if (msg == WM_GETMINMAXINFO)
         {
-            var mi = new MONITORINFO(); mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+            var mi = new MONITORINFO();
+            mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
             GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), ref mi);
+
             var mmi = (MINMAXINFO)Marshal.PtrToStructure(lParam, typeof(MINMAXINFO))!;
-            mmi.ptMaxSize.x = mi.rcWork.Right - mi.rcWork.Left; mmi.ptMaxSize.y = mi.rcWork.Bottom - mi.rcWork.Top;
-            mmi.ptMaxPosition.x = mi.rcWork.Left; mmi.ptMaxPosition.y = mi.rcWork.Top;
-            Marshal.StructureToPtr(mmi, lParam, true); handled = true;
+
+            // 1. Размер окна — строго по размеру рабочей области (без изменений)
+            mmi.ptMaxSize.x = mi.rcWork.Right - mi.rcWork.Left;
+            mmi.ptMaxSize.y = mi.rcWork.Bottom - mi.rcWork.Top;
+
+            // 2. ИСПРАВЛЕНИЕ: Вычитаем координаты самого монитора, чтобы получить относительное смещение.
+            // На основном мониторе это даст 0, а на втором — корректный сдвиг относительно его границ,
+            // предотвращая "улет" окна в невидимую зону.
+            mmi.ptMaxPosition.x = Math.Abs(mi.rcWork.Left - mi.rcMonitor.Left);
+            mmi.ptMaxPosition.y = Math.Abs(mi.rcWork.Top - mi.rcMonitor.Top);
+
+            Marshal.StructureToPtr(mmi, lParam, true);
+            handled = true;
         }
         else if (msg == WM_ACTIVATE)
         {
